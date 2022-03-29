@@ -1,0 +1,538 @@
+---
+title: '**Chapter 6 Lab**'
+author: "Jeremy Selva"
+subtitle: This document was prepared on `r format(Sys.Date())`.
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: no
+    code_folding: hide
+    code_download: yes
+    self_contained: true
+  rmarkdown::html_vignette:
+    toc: yes
+    toc_depth: 2
+bibliography: utils/bibliography.bib
+csl: utils/f1000research.csl
+editor_options:
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, warning=FALSE, message=TRUE, include=FALSE}
+# Set up the environment
+
+# Options relative to figure size
+# 1.618 is the golden ratio
+figheight <- 4
+figwidth <- 4 * 1.618 
+
+# General options
+options(knitr.kable.NA = "",
+        nsmall = 3,
+        tidyverse.quiet = TRUE
+        )
+hook_output <- knitr::knit_hooks$get('output')
+
+knitr::knit_hooks$set(
+  output = function(x, options) {
+    if (!is.null(options$max.height)) {
+      options$attr.output <- c(options$attr.output,
+                               sprintf('style="max-height: %s;"', options$max.height))
+    }
+    hook_output(x, options)
+    }
+  )
+
+# Chunk options (see https://yihui.org/knitr/options/#chunk_options)
+knitr::opts_chunk$set(
+  comment = ">",  # The prefix to be added before each line of the text output.
+  dpi = 600,
+  fig.path = "img/",
+  fig.height = figheight,
+  fig.width = figwidth,
+  fig.align = "center",
+  # See https://community.rstudio.com/t/centering-images-in-blogdown-post/20962
+  # to learn how to center images
+  # See https://bookdown.org/yihui/rmarkdown-cookbook/opts-tidy.html
+  # See https://www.zotero.org/styles for citation style respository
+  tidy='styler',
+  tidy.opts=list(strict=TRUE)
+)
+```
+
+```{r warning=FALSE, message=FALSE, results='asis'}
+library(leaps)
+library(tibble)
+library(magrittr)
+library(dplyr)
+library(tidyr)
+library(report)
+library(ISLR)
+
+library(reactable)
+
+library(parsnip)
+library(glmnet)
+library(rsample)
+library(recipes)
+library(tune)
+library(workflows)
+library(dials)
+
+summary(report::report(sessionInfo()))
+```
+
+# Subset Selection Methods
+
+## Best Subset Selection
+
+```{r, echo=FALSE}
+set.seed(1234)
+```
+
+We will be using the `Hitters` data set from the `ISLR` package. We wish
+to predict the baseball players `Salary` based on several different
+characteristics which are included in the data set.
+
+Remove all rows with missing data from that column.
+
+```{r, message=FALSE}
+
+Hitters <- as_tibble(ISLR::Hitters) %>%
+  tidyr::drop_na()
+```
+
+Use `regsubsets()` function to performs best subset selection.
+
+An asterisk indicates that a given variable is included in the
+corresponding model. For instance, this output indicates that the best
+two-variable model contains only Hits and CRBI.
+
+```{r, message = FALSE, max.height = '150px'}
+
+regfit.full <- leaps::regsubsets(
+  x = Salary ~ ., 
+  data = Hitters,
+  nvmax = 8 #default
+  )
+
+summary(regfit.full)
+```
+
+Here we fit up to a 19-variable model.
+
+```{r, message=FALSE}
+
+regfit.full <- leaps::regsubsets(
+  x = Salary ~ ., 
+  data = Hitters,
+  nvmax = 19 #default
+  )
+```
+
+The `summary()` function also returns $R^2$, $RSS$, adjusted $R^2$,
+$C_p$, and $BIC$. We can examine these to try to select the best overall
+model.
+
+```{r, message=FALSE}
+
+reg.summary <- regfit.full %>%
+  summary()
+
+names(reg.summary)
+```
+
+For instance, we see that the $R^2$ statistic increases from 32 %, when
+only one variable is included in the model, to almost 55 %, when all
+variables are included. As expected, the $R^2$ statistic increases
+monotonically as more variables are included.
+
+```{r, message=FALSE}
+
+reg.summary$rsq
+```
+
+The `regsubsets()` function has a built-in `plot()` command which can be
+used to display the selected variables for the best model with a given
+number of predictors, ranked according to the $BIC$, $C_p$, adjusted
+$R^2$, or $AIC$. To find out more about this function, type
+`?plot.regsubsets`.
+
+The top row of each plot contains a black square for each variable
+selected according to the optimal model associated with that statistic.
+For instance, we see that several models share a $BIC$ close to $−150$.
+However, the model with the lowest $BIC$ is the six-variable model that
+contains only `AtBat`, `Hits`, `Walks`, `CRBI`, `DivisionW`, and
+`PutOuts`.
+
+```{r, message=FALSE}
+plot(regfit.full , scale = "bic")
+```
+
+We can use the `coef()` function to see the coefficient estimates
+associated with this model.
+
+```{r, message=FALSE}
+coef(regfit.full , 6)
+```
+
+## Forward and Backward Stepwise Selection
+
+We can also use the `regsubsets()` function to perform forward stepwise
+selection using the argument `method = "forward"`
+
+```{r, message=FALSE, max.height='150px'}
+regfit.fwd <- leaps::regsubsets(
+  x = Salary ~ ., 
+  data = Hitters ,
+  nvmax = 19, 
+  method = "forward"
+)
+
+summary(regfit.fwd)
+```
+
+To perform backward stepwise selection, use the argument
+`method = "backward"`
+
+```{r, message=FALSE, max.height='150px'}
+regfit.bwd <- leaps::regsubsets(
+  x = Salary ~ ., 
+  data = Hitters ,
+  nvmax = 19, 
+  method = "backward"
+)
+
+summary(regfit.bwd)
+```
+
+For this data, the best seven-variable models identified by forward
+stepwise selection, backward stepwise selection, and best subset
+selection are different.
+
+```{r, message=FALSE}
+
+coef(regfit.full,7)
+coef(regfit.fwd,7)
+coef(regfit.bwd,7)
+
+```
+
+## Choosing Among Models Using the Validation-Set Approach
+
+We split the samples into training set and a test set
+
+```{r, message=FALSE}
+
+set.seed (1)
+
+Hitters <- Hitters %>%
+  dplyr::mutate(
+    isTrainingSet = sample(x = c(TRUE , FALSE),
+                           size = nrow(Hitters),
+                           replace = TRUE)
+  ) %>%
+  dplyr::relocate(.data[["isTrainingSet"]])
+
+train <- Hitters %>%
+  dplyr::filter(.data[["isTrainingSet"]] == TRUE) %>%
+  dplyr::select(-c("isTrainingSet"))
+
+test <- Hitters %>%
+  dplyr::filter(.data[["isTrainingSet"]]== FALSE) %>%
+  dplyr::select(-c("isTrainingSet"))
+
+```
+
+Now, we apply `regsubsets()` to the training set in order to perform
+best subset selection and compute the the validation set error for the
+best model of each model size.
+
+```{r, message=FALSE}
+
+regfit.best <- leaps::regsubsets(Salary ~ ., data = train, nvmax = 19)
+
+test.mat <- stats::model.matrix(Salary ~ ., data = test)
+
+val.errors <- rep(NA, 19)
+
+for (i in 1:19) {
+  coefi <- stats::coef(regfit.best , id = i)
+  pred <- test.mat[, names(coefi)] %*% coefi
+  val.errors[i] <- mean (( test$Salary - pred)^2)
+}
+
+val.errors
+```
+
+We find that the best model is the one that contains seven variables.
+
+```{r, message=FALSE}
+which.min(val.errors)
+
+coef(regfit.best , 7)
+```
+
+However, the best seven-variable model on the full data set has a
+different set of variables than the best seven-variable model on the
+training set.
+
+```{r, message=FALSE}
+regfit.best <- leaps::regsubsets(Salary ~ ., data = Hitters , nvmax = 19)
+coef(regfit.best , 7)
+```
+
+## Choosing Among Models Using Cross-Validation
+
+We now try to choose among the models of different sizes using cross
+validation. Create a vector that allocates each observation to one of k
+= 10 folds.
+
+```{r, message=FALSE}
+set.seed (1)
+
+k <- 10
+n <- nrow(Hitters)
+folds <- sample(rep (1:k, length = n))
+
+```
+
+We write a for loop that performs cross-validation
+
+```{r, message=FALSE}
+
+# A predict method for regsubsets
+predict.regsubsets <- function(object , newdata , id, ...) {
+  form <- as.formula(object$call [[2]])
+  mat <- model.matrix(form , newdata)
+  coefi <- coef(object , id = id)
+  xvars <- names(coefi)
+  mat[, xvars] %*% coefi
+  }
+
+cv.errors <- matrix(NA, k, 19,
+                    dimnames = list(NULL , paste (1:19)))
+for (j in 1:k) {
+  best.fit <- leaps::regsubsets(Salary ~ .,
+                                data = Hitters[folds != j,],
+                                nvmax = 19)
+  for (i in 1:19) {
+    pred <- stats::predict(best.fit, Hitters[folds == j, ], id = i)
+    cv.errors[j, i] <- mean(( Hitters$Salary[folds == j] - pred)^2)
+  }
+  }
+
+```
+
+This has given us a $10$ by $19$ matrix, of which the $(j, i)$th element
+corresponds to the test $MSE$ for the $j$th cross-validation fold for
+the best $i$-variable model.
+
+We use the `apply()` function to average over the columns of this
+`apply()` matrix in order to obtain a vector for which the $i$th element
+is the cross validation error for the $i$-variable model.
+
+```{r, message=FALSE}
+
+mean.cv.errors <- apply(cv.errors , 2, mean)
+
+plot(mean.cv.errors , type = "b")
+
+```
+
+We see that cross-validation selects a 10-variable model.
+
+```{r, message=FALSE}
+regfit.best <- leaps::regsubsets(Salary ~ ., data = Hitters , nvmax = 19)
+coef(regfit.best , 10)
+```
+
+# Ridge Regression and the Lasso
+
+## Ridge Regression
+
+Set mixture to 0 to indicate Ridge Regression. For now, we set
+penalty/lambda as 0
+
+```{r, message=FALSE}
+Hitters <- as_tibble(ISLR::Hitters) %>%
+  tidyr::drop_na()
+
+ridge_spec <- parsnip::linear_reg(mixture = 0,
+                                  penalty = 0) %>%
+  parsnip::set_mode("regression") %>%
+  parsnip::set_engine("glmnet")
+
+ridge_spec %>%
+  parsnip::translate()
+```
+
+Once the specification is created we can fit it to our data. We will use
+all the predictors.
+
+```{r, message=FALSE}
+set.seed(1)
+ridge_fit <- ridge_spec %>%
+  parsnip::fit(formula = Salary ~ ., 
+               data = Hitters)
+```
+
+We can see the parameter estimate for different values of
+penalty/lambda. Notice how the estimates are decreasing when the amount
+of penalty goes up
+
+```{r, message=FALSE, max.height='150px'}
+parsnip::tidy(ridge_fit)
+parsnip::tidy(ridge_fit, penalty = 705)
+parsnip::tidy(ridge_fit, penalty = 11498)
+```
+
+We can visualize how the magnitude of the coefficients are being
+regularized towards zero as the penalty goes up.
+
+```{r, message=FALSE}
+# Arrange figure margin
+par(mar=c(5,5,5,1))
+ridge_fit %>%
+  parsnip::extract_fit_engine() %>%
+  plot(xvar = "lambda")
+```
+
+It would be nice if we could find the "best" value of the
+penalty/lambda. We can do this using the `tune::tune_grid()`
+
+Need we need three things in order to use the `tune::tune_grid()`
+
+-   a `resample` object containing the resamples the `workflow` should be
+    fitted within,
+    
+-   a `workflow` object containing the model and preprocessor,and
+
+-   a tibble `penalty_grid` containing the parameter values to be evaluated.
+
+First, we create a 10-fold cross-validation data set from the training
+data set.
+
+### Create the resample object
+
+```{r, message=FALSE}
+
+Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
+
+Hitters_train <- rsample::training(Hitters_split)
+Hitters_test <- rsample::testing(Hitters_split)
+
+Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
+
+```
+
+
+### Create the preprocessor
+
+We use the `recipes` package to create the preporcessing steps. However, the order of the preprocessing step is actually important. See the [Ordering of steps vignette](https://cran.r-project.org/web/packages/recipes/vignettes/Ordering.html) 
+
+We create a basic recipe.
+
+```{r, message=FALSE}
+
+ridge_recipe <- recipes::recipe(formula = Salary ~ .,
+                                data = Hitters_train)
+
+rec <- recipes::prep(x = ridge_recipe, training = Hitters_train)
+  
+rec %>%
+  summary() %>%
+  reactable::reactable(defaultPageSize = 5)
+
+rec %>%
+  recipes::bake(new_data = Hitters_train) %>%
+  reactable::reactable(defaultPageSize = 5)
+
+```
+
+Do preprocessing on the factor variables.
+
+```{r, message=FALSE}
+
+ridge_recipe <- ridge_recipe %>%
+  # Step Novel is important.
+  # If test set has a new factor not found in training, it will be treated as "new" and not NA
+  # This will prevent the model from giving an error
+  # https://blog.datascienceheroes.com/how-to-use-recipes-package-for-one-hot-encoding/
+  recipes::step_novel(recipes::all_nominal_predictors()) %>%
+  # Create Dummy variables
+  recipes::step_dummy(recipes::all_nominal_predictors())
+
+rec <- recipes::prep(x = ridge_recipe, training = Hitters_train)
+  
+rec %>%
+  summary() %>%
+  reactable::reactable(defaultPageSize = 5)
+
+rec %>%
+  recipes::bake(new_data = Hitters_train) %>%
+  reactable::reactable(defaultPageSize = 5)
+
+```
+
+Do normalisation step.
+
+```{r, message=FALSE}
+
+ridge_recipe <- ridge_recipe %>%
+  # Remove predictors with zero variation
+  recipes::step_zv(recipes::all_predictors()) %>%
+  # Standardise all variable
+  recipes::step_normalize(recipes::all_predictors())
+
+rec <- recipes::prep(x = ridge_recipe, training = Hitters_train)
+  
+rec %>%
+  recipes::bake(new_data = Hitters_train) %>%
+  reactable::reactable(defaultPageSize = 5)
+
+
+```
+
+### Specify the model
+
+The model specification will look very similar to what we have seen earlier, but we will set `penalty = tune::tune()`. This tells `tune::tune_grid()` that the penalty parameter should be tuned.
+
+```{r, message=FALSE}
+
+ridge_spec <- 
+  parsnip::linear_reg(penalty = tune::tune(), mixture = 0) %>% 
+  parsnip::set_mode("regression") %>% 
+  parsnip::set_engine("glmnet")
+
+
+```
+
+### Create the workflow
+
+```{r, message=FALSE}
+
+ridge_workflow <-  workflows::workflow() %>% 
+  workflows::add_recipe(ridge_recipe) %>% 
+  workflows::add_model(ridge_spec)
+
+ridge_workflow
+```
+
+### Create the penalty/lambda grid
+
+```{r, message=FALSE}
+
+penalty_grid <- dials::grid_regular(dials::penalty(range = c(-5, 5)), levels = 50)
+
+penalty_grid  %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
