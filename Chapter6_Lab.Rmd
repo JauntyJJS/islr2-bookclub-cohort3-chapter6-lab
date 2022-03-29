@@ -7,12 +7,12 @@ output:
     theme: cerulean
     highlight: pygments
     toc: yes
-    toc_depth: 2
+    toc_depth: 3
     toc_float:
       collapsed: true
       smooth_scroll: true
     number_sections: no
-    code_folding: hide
+    code_folding: show
     code_download: yes
     self_contained: true
   rmarkdown::html_vignette:
@@ -86,6 +86,14 @@ library(recipes)
 library(tune)
 library(workflows)
 library(dials)
+library(yardstick)
+
+# For recipes::step_pls
+# Warning message:
+#  `step_pls()` failed: Error in loadNamespace(x) : there is no package called ‘mixOmics’
+# Install from Bioconductor
+library(mixOmics)
+
 
 summary(report::report(sessionInfo()))
 ```
@@ -232,7 +240,7 @@ We split the samples into training set and a test set
 
 ```{r, message=FALSE}
 
-set.seed (1)
+set.seed(1234)
 
 Hitters <- Hitters %>%
   dplyr::mutate(
@@ -355,9 +363,9 @@ regfit.best <- leaps::regsubsets(Salary ~ ., data = Hitters , nvmax = 19)
 coef(regfit.best , 10)
 ```
 
-# Ridge Regression and the Lasso
+# Ridge Regression
 
-## Ridge Regression
+## Introduction to ridge regression 
 
 Set mixture to 0 to indicate Ridge Regression. For now, we set
 penalty/lambda as 0
@@ -379,7 +387,6 @@ Once the specification is created we can fit it to our data. We will use
 all the predictors.
 
 ```{r, message=FALSE}
-set.seed(1)
 ridge_fit <- ridge_spec %>%
   parsnip::fit(formula = Salary ~ ., 
                data = Hitters)
@@ -421,9 +428,12 @@ Need we need three things in order to use the `tune::tune_grid()`
 First, we create a 10-fold cross-validation data set from the training
 data set.
 
-### Create the resample object
+## Create the resample object
 
 ```{r, message=FALSE}
+set.seed(1234)
+Hitters <- as_tibble(ISLR::Hitters) %>%
+  tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
 
@@ -434,8 +444,7 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ```
 
-
-### Create the preprocessor
+## Create the preprocessor
 
 We use the `recipes` package to create the preporcessing steps. However, the order of the preprocessing step is actually important. See the [Ordering of steps vignette](https://cran.r-project.org/web/packages/recipes/vignettes/Ordering.html) 
 
@@ -502,7 +511,7 @@ rec %>%
 
 ```
 
-### Specify the model
+## Specify the model
 
 The model specification will look very similar to what we have seen earlier, but we will set `penalty = tune::tune()`. This tells `tune::tune_grid()` that the penalty parameter should be tuned.
 
@@ -513,10 +522,11 @@ ridge_spec <-
   parsnip::set_mode("regression") %>% 
   parsnip::set_engine("glmnet")
 
-
+ridge_spec %>%
+  parsnip::translate()
 ```
 
-### Create the workflow
+## Create the workflow
 
 ```{r, message=FALSE}
 
@@ -527,12 +537,484 @@ ridge_workflow <-  workflows::workflow() %>%
 ridge_workflow
 ```
 
-### Create the penalty/lambda grid
+## Create the penalty/lambda grid
+
+A penalty/lambda grid of $50$ numbers from $0.00001$ ($10^{-5}$) to $10000$ ($10^5$) is created.
 
 ```{r, message=FALSE}
 
+# Create a range from 10
 penalty_grid <- dials::grid_regular(dials::penalty(range = c(-5, 5)), levels = 50)
 
 penalty_grid  %>% 
   reactable::reactable(defaultPageSize = 5)
+```
+
+## Ridge regression model fitting on cross validated data
+
+Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res <- tune::tune_grid(
+  object = ridge_workflow,
+  resamples = Hitters_fold, 
+  grid = penalty_grid
+)
+
+tune_res
+```
+
+Here we see that the amount of regularization affects the performance metrics differently. Do note that using a different seed will give a different plot
+
+```{r, message=FALSE}
+# Note that a different seed will give different plots
+tune::autoplot(tune_res)
+```
+
+We can also see the raw metrics that created this chart by calling `tune::collect_metrics()`.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune::collect_metrics(tune_res) %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 569 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different penalty/lambda value
+
+```{r, message=FALSE, max.height='150px'}
+
+top_penalty <- tune::show_best(tune_res, metric = "rsq", n = 5)
+top_penalty
+
+best_penalty <- tune::select_best(tune_res, metric = "rsq")
+best_penalty
+
+```
+
+## Ridge regression model with optimised penalty/lambda value
+
+We create the ridge regression workflow with the best penalty score.
+
+```{r, message=FALSE}
+
+ridge_final <- tune::finalize_workflow(x = ridge_workflow, 
+                                       parameters = best_penalty)
+
+ridge_final
+```
+
+We now train the ridge regression model with the training data
+
+```{r, message=FALSE}
+
+ridge_final_fit <- parsnip::fit(object = ridge_final, data = Hitters_train)
+```
+
+## Ridge regression model on test data
+
+This ridge regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+
+```{r, message=FALSE}
+
+test_results <- parsnip::augment(x = ridge_final_fit, new_data = Hitters_test)
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
+```
+
+```{r, message=FALSE}
+test_results %>%
+  yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+# The Lasso
+
+The following procedure will be very similar to what we saw in the ridge regression section. The resampling step is the same
+
+## Create the resample object
+
+```{r, message=FALSE}
+set.seed(1234)
+Hitters <- as_tibble(ISLR::Hitters) %>%
+  tidyr::drop_na()
+
+Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
+
+Hitters_train <- rsample::training(Hitters_split)
+Hitters_test <- rsample::testing(Hitters_split)
+
+Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
+
+```
+
+## Create the preprocessor
+
+The following procedure will be very similar to what we saw in the ridge regression section. The preprocessing needed is the same.
+
+```{r, message=FALSE}
+
+lasso_recipe <- 
+  recipes::recipe(formula = Salary ~ ., data = Hitters_train) %>% 
+  recipes::step_novel(recipes::all_nominal_predictors()) %>% 
+  recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
+  recipes::step_zv(recipes::all_predictors()) %>% 
+  recipes::step_normalize(recipes::all_predictors())
+```
+
+## Specify the model
+
+This time, it is `mixture=1`
+
+```{r, message=FALSE}
+
+lasso_spec <- 
+  parsnip::linear_reg(penalty = tune::tune(), mixture = 1) %>% 
+  parsnip::set_mode("regression") %>% 
+  parsnip::set_engine("glmnet")
+
+lasso_spec %>%
+  parsnip::translate()
+
+```
+
+## Create the workflow
+
+```{r, message=FALSE}
+
+lasso_workflow <-  workflows::workflow() %>% 
+  workflows::add_recipe(lasso_recipe) %>% 
+  workflows::add_model(lasso_spec)
+
+lasso_workflow
+```
+
+## Create the penalty/lambda grid
+
+A penalty/lambda grid of $50$ numbers from $0.01$ ($10^{-2}$) to $100$ ($10^2$) is created.
+
+```{r, message=FALSE}
+
+# Create a range from 10
+penalty_grid <- dials::grid_regular(dials::penalty(range = c(-2, 2)), levels = 50)
+
+penalty_grid  %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+## Lasso model fitting on cross validated data
+
+Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res <- tune::tune_grid(
+  object = lasso_workflow,
+  resamples = Hitters_fold, 
+  grid = penalty_grid
+)
+
+tune_res
+```
+
+Here we see that the amount of regularization affects the performance metrics differently. Do note that using a different seed will give a different plot
+
+```{r, message=FALSE}
+# Note that a different seed will give different plots
+tune::autoplot(tune_res)
+```
+
+
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 22.2 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different penalty/lambda value
+
+```{r, message=FALSE, max.height='150px'}
+
+top_penalty <- tune::show_best(tune_res, metric = "rsq", n = 5)
+top_penalty
+
+best_penalty <- tune::select_best(tune_res, metric = "rsq")
+best_penalty
+
+```
+
+## Lasso model with optimised penalty/lambda value
+
+We create the lasso regression workflow with the best penalty score.
+
+```{r, message=FALSE}
+
+lasso_final <- tune::finalize_workflow(x = lasso_workflow, 
+                                       parameters = best_penalty)
+
+lasso_final
+```
+
+We now train the lasso regression model with the training data
+
+```{r, message=FALSE}
+
+lasso_final_fit <- parsnip::fit(object = lasso_final, data = Hitters_train)
+```
+
+## Lasso regression model on test data
+
+This lasso regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+
+```{r, message=FALSE}
+
+test_results <- parsnip::augment(x = lasso_final_fit, new_data = Hitters_test)
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
+```
+
+```{r, message=FALSE}
+test_results %>%
+  yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+# Principal Components Regression
+
+The principal component regression is a linear model with pca transformed data. Hence, the major changes will be on the preprocessing steps.
+
+## Create the resample object
+
+```{r, message=FALSE}
+set.seed(1234)
+Hitters <- as_tibble(ISLR::Hitters) %>%
+  tidyr::drop_na()
+
+Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
+
+Hitters_train <- rsample::training(Hitters_split)
+Hitters_test <- rsample::testing(Hitters_split)
+
+Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
+
+```
+
+## Create the preprocessor
+
+We add [`recipes::step_pca`](https://recipes.tidymodels.org/reference/step_pca.html) this time to perfrom principal component analysis on all the predictors.
+Threshold is the fraction of the total variance that should be covered by the components. 
+
+For the below example, `threshold = .75` means that step_pca should generate enough components to capture 75 percent of the variability in the variables. Note: using this argument will override and reset any value given to `num_comp`.
+
+
+```{r, message=FALSE}
+
+pca_recipe <- 
+  recipes::recipe(formula = Salary ~ ., data = Hitters_train) %>% 
+  recipes::step_novel(recipes::all_nominal_predictors()) %>% 
+  recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
+  recipes::step_zv(recipes::all_predictors()) %>% 
+  recipes::step_normalize(recipes::all_predictors()) %>%
+  recipes::step_pca(recipes::all_predictors(), threshold = 0.75)
+```
+
+```{r, message=FALSE}
+
+rec <- recipes::prep(x = pca_recipe, training = Hitters_train)
+  
+rec %>%
+  summary() %>%
+  reactable::reactable(defaultPageSize = 5)
+
+rec %>%
+  recipes::bake(new_data = Hitters_train) %>%
+  reactable::reactable(defaultPageSize = 5)
+
+```
+
+We will now try to find the best threshold value using the `tune::tune()`
+
+```{r, message=FALSE}
+
+pca_recipe <- 
+  recipes::recipe(formula = Salary ~ ., data = Hitters_train) %>% 
+  recipes::step_novel(recipes::all_nominal_predictors()) %>% 
+  recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
+  recipes::step_zv(recipes::all_predictors()) %>% 
+  recipes::step_normalize(recipes::all_predictors()) %>%
+  recipes::step_pca(recipes::all_predictors(), threshold = tune::tune())
+```
+
+## Specify the model
+
+We use a linear model
+
+```{r, message=FALSE}
+
+lm_spec <- 
+  parsnip::linear_reg() %>% 
+  parsnip::set_mode("regression") %>% 
+  parsnip::set_engine("lm")
+
+lm_spec %>%
+  parsnip::translate()
+
+```
+
+## Create the workflow
+
+```{r, message=FALSE}
+
+pca_workflow <-  workflows::workflow() %>% 
+  workflows::add_recipe(pca_recipe) %>% 
+  workflows::add_model(lm_spec)
+
+pca_workflow
+```
+
+## Create the threshold grid
+
+A penalty/lambda grid of $10$ numbers from $0$ to $1$ is created.
+
+```{r, message=FALSE}
+
+# Create a range from 10
+threshold_grid  <- dials::grid_regular(dials::threshold(range = c(0, 1)), levels = 10)
+
+threshold_grid %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+## Principal component regression model fitting on cross validated data
+
+Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res <- tune::tune_grid(
+  object = pca_workflow,
+  resamples = Hitters_fold, 
+  grid = threshold_grid
+)
+
+tune_res
+```
+
+Here we see how different threshold (Variance coverage) affects the performance metrics differently. Do note that using a different seed will give a different plot
+
+```{r, message=FALSE}
+# Note that a different seed will give different plots
+tune::autoplot(tune_res)
+```
+
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The threshold value is 0.889 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different penalty/lambda value
+
+```{r, message=FALSE, max.height='150px'}
+
+top_threshold <- tune::show_best(tune_res, metric = "rmse", n = 5)
+top_threshold
+
+best_threshold <- tune::select_best(tune_res, metric = "rmse")
+best_threshold
+
+```
+
+## Principal component regression model with optimised threshold value
+
+We create the principal component regression workflow with the best threshold.
+
+```{r, message=FALSE}
+
+pca_final <- tune::finalize_workflow(x = pca_workflow, 
+                                     parameters = best_threshold)
+
+pca_final
+```
+
+We now train the lasso regression model with the training data
+
+```{r, message=FALSE}
+
+pca_final_fit <- parsnip::fit(object = pca_final, data = Hitters_train)
+```
+
+## Principal component regression model on test data
+
+This principal component regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+
+```{r, message=FALSE}
+
+test_results <- parsnip::augment(x = pca_final_fit, new_data = Hitters_test)
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
+```
+
+```{r, message=FALSE}
+test_results %>%
+  yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+# Partial Least Square
+
+The partial least square regression is a linear model with pls transformed data. Hence, the major changes will be on the preprocessing steps.
+
+## Create the resample object
+
+```{r, message=FALSE}
+set.seed(1234)
+Hitters <- as_tibble(ISLR::Hitters) %>%
+  tidyr::drop_na()
+
+Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
+
+Hitters_train <- rsample::training(Hitters_split)
+Hitters_test <- rsample::testing(Hitters_split)
+
+Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
+
+```
+
+## Create the preprocessor
+
+We add [`recipes::step_pls`](https://recipes.tidymodels.org/reference/step_pls.html) this time to perform partial least square calculation on all the predictors.
+`num_comp` is the number of partial least square components to retain as new predictors.
+`outcome` is the response variable for partial least square regression to use.
+
+```{r, message=FALSE}
+
+pls_recipe <- 
+  recipes::recipe(formula = Salary ~ ., data = Hitters_train) %>% 
+  recipes::step_novel(recipes::all_nominal_predictors()) %>% 
+  recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
+  recipes::step_zv(recipes::all_predictors()) %>% 
+  recipes::step_normalize(recipes::all_predictors()) %>%
+  recipes::step_pls(recipes::all_predictors(), num_comp = 4, outcome = "Salary")
+```
+
+```{r, message=FALSE}
+
+rec <- recipes::prep(x = pls_recipe, training = Hitters_train)
+  
+rec %>%
+  summary() %>%
+  reactable::reactable(defaultPageSize = 5)
+
+rec %>%
+  recipes::bake(new_data = Hitters_train) %>%
+  reactable::reactable(defaultPageSize = 5)
+
+```
+
+We will now try to find the best threshold value using the `tune::tune()`
+
+```{r, message=FALSE}
+
+pls_recipe <- 
+  recipes::recipe(formula = Salary ~ ., data = Hitters_train) %>% 
+  recipes::step_novel(recipes::all_nominal_predictors()) %>% 
+  recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
+  recipes::step_zv(recipes::all_predictors()) %>% 
+  recipes::step_normalize(recipes::all_predictors()) %>%
+  recipes::step_pls(recipes::all_predictors(), num_comp = tune::tune() , outcome = "Salary")
 ```
