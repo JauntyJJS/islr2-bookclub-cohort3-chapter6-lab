@@ -14,7 +14,8 @@ output:
     number_sections: no
     code_folding: show
     code_download: yes
-    self_contained: true
+    self_contained: false
+    lib_dir: "rmarkdown_libs"
   rmarkdown::html_vignette:
     toc: yes
     toc_depth: 2
@@ -74,10 +75,15 @@ library(tibble)
 library(magrittr)
 library(dplyr)
 library(tidyr)
+library(forcats)
 library(report)
 library(ISLR)
 
 library(reactable)
+library(ggplot2)
+library(vip)
+
+library(doParallel)
 
 library(parsnip)
 library(glmnet)
@@ -390,6 +396,7 @@ all the predictors.
 ridge_fit <- ridge_spec %>%
   parsnip::fit(formula = Salary ~ ., 
                data = Hitters)
+
 ```
 
 We can see the parameter estimate for different values of
@@ -397,9 +404,12 @@ penalty/lambda. Notice how the estimates are decreasing when the amount
 of penalty goes up
 
 ```{r, message=FALSE, max.height='150px'}
-parsnip::tidy(ridge_fit)
-parsnip::tidy(ridge_fit, penalty = 705)
-parsnip::tidy(ridge_fit, penalty = 11498)
+parsnip::tidy(ridge_fit) %>%
+  reactable::reactable(defaultPageSize = 5)
+parsnip::tidy(ridge_fit, penalty = 705) %>%
+  reactable::reactable(defaultPageSize = 5)
+parsnip::tidy(ridge_fit, penalty = 11498) %>%
+  reactable::reactable(defaultPageSize = 5)
 ```
 
 We can visualize how the magnitude of the coefficients are being
@@ -528,7 +538,7 @@ ridge_spec %>%
 
 ## Create the workflow
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 ridge_workflow <-  workflows::workflow() %>% 
   workflows::add_recipe(ridge_recipe) %>% 
@@ -555,6 +565,7 @@ penalty_grid  %>%
 Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
 
 ```{r, message=FALSE, max.height='150px'}
+doParallel::registerDoParallel()
 
 tune_res <- tune::tune_grid(
   object = ridge_workflow,
@@ -580,6 +591,26 @@ tune::collect_metrics(tune_res) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
+Here is the `ggplot` way should `tune::autoplot` fails
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res %>%
+  tune::collect_metrics() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["penalty"]],
+                                         y = .data[["mean"]],
+                                         colour = .data[[".metric"]])) +
+  ggplot2::geom_errorbar(mapping = ggplot2::aes(ymin = .data[["mean"]] - .data[["std_err"]],
+                                                ymax = .data[["mean"]] + .data[["std_err"]]),
+                         alpha = 0.5) +
+  ggplot2::geom_line(size = 1.5) +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[[".metric"]]), 
+                      scales = "free", 
+                      nrow = 2) +
+  ggplot2::scale_x_log10() +
+  ggplot2::theme(legend.position = "none")
+```
+
 The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 569 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different best penalty/lambda value.
 
 ```{r, message=FALSE, max.height='150px'}
@@ -596,7 +627,7 @@ best_penalty
 
 We create the ridge regression workflow with the best penalty score.
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 ridge_final <- tune::finalize_workflow(x = ridge_workflow, 
                                        parameters = best_penalty)
@@ -611,9 +642,38 @@ We now train the ridge regression model with the training data
 ridge_final_fit <- parsnip::fit(object = ridge_final, data = Hitters_train)
 ```
 
+## Variable Importance
+
+While we’re at it, let’s see what the most important variables are using the `vip` package.
+
+```{r, message=FALSE}
+
+vip_table <- ridge_final_fit %>%
+  workflows::extract_fit_parsnip() %>%
+  vip::vi(lambda = best_penalty$penalty) 
+
+vip_table %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+```{r, message=FALSE}
+vip_table %>% 
+  dplyr::mutate(
+    Importance = abs(.data[["Importance"]]),
+    Variable = forcats::fct_reorder(.f = .data[["Variable"]], 
+                                    .x = .data[["Importance"]])
+  ) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["Importance"]], 
+                                         y = .data[["Variable"]], 
+                                         fill = .data[["Sign"]])) +
+  ggplot2::geom_col() +
+  ggplot2::scale_x_continuous(expand = c(0, 0)) +
+  ggplot2::labs(y = NULL)
+```
+
 ## Ridge regression model on test data
 
-This ridge regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+This ridge regression model can now be applied on our testing data set to validate its performance. For regression models, a `.pred` column is added.
 
 ```{r, message=FALSE}
 
@@ -628,6 +688,19 @@ test_results %>%
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
+```
+
+Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+
+```{r, message=FALSE}
+
+test_results <- tune::last_fit(object = ridge_final_fit, 
+                               split = Hitters_split) %>%
+  tune::collect_metrics()
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
 ```
 
 # The Lasso
@@ -682,7 +755,7 @@ lasso_spec %>%
 
 ## Create the workflow
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 lasso_workflow <-  workflows::workflow() %>% 
   workflows::add_recipe(lasso_recipe) %>% 
@@ -696,6 +769,7 @@ lasso_workflow
 A penalty/lambda grid of $50$ numbers from $0.01$ ($10^{-2}$) to $100$ ($10^2$) is created.
 
 ```{r, message=FALSE}
+doParallel::registerDoParallel()
 
 # Create a range from 10
 penalty_grid <- dials::grid_regular(dials::penalty(range = c(-2, 2)), levels = 50)
@@ -726,6 +800,34 @@ Here we see that the amount of regularization affects the performance metrics di
 tune::autoplot(tune_res)
 ```
 
+We can also see the raw metrics that created this chart by calling `tune::collect_metrics()`.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune::collect_metrics(tune_res) %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Here is the `ggplot` way should `tune::autoplot` fails
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res %>%
+  tune::collect_metrics() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["penalty"]],
+                                         y = .data[["mean"]],
+                                         colour = .data[[".metric"]])) +
+  ggplot2::geom_errorbar(mapping = ggplot2::aes(ymin = .data[["mean"]] - .data[["std_err"]],
+                                                ymax = .data[["mean"]] + .data[["std_err"]]),
+                         alpha = 0.5) +
+  ggplot2::geom_line(size = 1.5) +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[[".metric"]]), 
+                      scales = "free", 
+                      nrow = 2) +
+  ggplot2::scale_x_log10() +
+  ggplot2::theme(legend.position = "none")
+```
+
 
 The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 22.2 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different best penalty/lambda value.
 
@@ -743,7 +845,7 @@ best_penalty
 
 We create the lasso regression workflow with the best penalty score.
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 lasso_final <- tune::finalize_workflow(x = lasso_workflow, 
                                        parameters = best_penalty)
@@ -756,6 +858,35 @@ We now train the lasso regression model with the training data
 ```{r, message=FALSE}
 
 lasso_final_fit <- parsnip::fit(object = lasso_final, data = Hitters_train)
+```
+
+## Variable Importance
+
+While we’re at it, let’s see what the most important variables are using the `vip` package.
+
+```{r, message=FALSE}
+
+vip_table <- lasso_final_fit %>%
+  workflows::extract_fit_parsnip() %>%
+  vip::vi(lambda = best_penalty$penalty) 
+
+vip_table %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+```{r, message=FALSE}
+vip_table %>% 
+  dplyr::mutate(
+    Importance = abs(.data[["Importance"]]),
+    Variable = forcats::fct_reorder(.f = .data[["Variable"]], 
+                                    .x = .data[["Importance"]])
+  ) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["Importance"]], 
+                                         y = .data[["Variable"]], 
+                                         fill = .data[["Sign"]])) +
+  ggplot2::geom_col() +
+  ggplot2::scale_x_continuous(expand = c(0, 0)) +
+  ggplot2::labs(y = NULL)
 ```
 
 ## Lasso regression model on test data
@@ -775,6 +906,19 @@ test_results %>%
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
+```
+
+Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+
+```{r, message=FALSE}
+
+test_results <- tune::last_fit(object = lasso_final_fit, 
+                               split = Hitters_split) %>%
+  tune::collect_metrics()
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
 ```
 
 # Principal Components Regression
@@ -861,7 +1005,7 @@ lm_spec %>%
 
 ## Create the workflow
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 pca_workflow <-  workflows::workflow() %>% 
   workflows::add_recipe(pca_recipe) %>% 
@@ -875,6 +1019,7 @@ pca_workflow
 A threshold grid of $10$ numbers from $0$ to $1$ is created.
 
 ```{r, message=FALSE}
+doParallel::registerDoParallel()
 
 # Create a range from 10
 threshold_grid  <- dials::grid_regular(dials::threshold(range = c(0, 1)), levels = 10)
@@ -921,7 +1066,7 @@ best_threshold
 
 We create the principal component regression workflow with the best threshold.
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 pca_final <- tune::finalize_workflow(x = pca_workflow, 
                                      parameters = best_threshold)
@@ -953,6 +1098,19 @@ test_results %>%
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
+```
+
+Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+
+```{r, message=FALSE}
+
+test_results <- tune::last_fit(object = pca_final_fit, 
+                               split = Hitters_split) %>%
+  tune::collect_metrics()
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
 ```
 
 # Partial Least Square
@@ -1037,7 +1195,7 @@ lm_spec %>%
 
 ## Create the workflow
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 pls_workflow <-  workflows::workflow() %>% 
   workflows::add_recipe(pls_recipe) %>% 
@@ -1051,6 +1209,7 @@ pls_workflow
 A number of components grid of $10$ numbers from $1$ to $20$ is created.
 
 ```{r, message=FALSE}
+doParallel::registerDoParallel()
 
 # Create a range from 10
 num_comp_grid  <- dials::grid_regular(dials::num_comp(range = c(1, 20)), levels = 10)
@@ -1097,7 +1256,7 @@ best_num_comp
 
 We create the partial least square regression workflow with the best threshold.
 
-```{r, message=FALSE}
+```{r, message=FALSE, max.height='150px'}
 
 pls_final <- tune::finalize_workflow(x = pls_workflow, 
                                      parameters = best_num_comp)
@@ -1129,6 +1288,19 @@ test_results %>%
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
+```
+
+Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+
+```{r, message=FALSE}
+
+test_results <- tune::last_fit(object = pls_final_fit, 
+                               split = Hitters_split) %>%
+  tune::collect_metrics()
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
 ```
 
 # Rmarkdown Template
