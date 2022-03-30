@@ -580,7 +580,7 @@ tune::collect_metrics(tune_res) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 569 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different penalty/lambda value
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 569 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different best penalty/lambda value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -727,7 +727,7 @@ tune::autoplot(tune_res)
 ```
 
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 22.2 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different penalty/lambda value
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 22.2 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different best penalty/lambda value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -872,7 +872,7 @@ pca_workflow
 
 ## Create the threshold grid
 
-A penalty/lambda grid of $10$ numbers from $0$ to $1$ is created.
+A threshold grid of $10$ numbers from $0$ to $1$ is created.
 
 ```{r, message=FALSE}
 
@@ -905,7 +905,7 @@ Here we see how different threshold (Variance coverage) affects the performance 
 tune::autoplot(tune_res)
 ```
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The threshold value is 0.889 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different penalty/lambda value
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The threshold value is 0.889 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different best number of threshold value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -929,7 +929,7 @@ pca_final <- tune::finalize_workflow(x = pca_workflow,
 pca_final
 ```
 
-We now train the lasso regression model with the training data
+We now train the principal component regression model with the training data
 
 ```{r, message=FALSE}
 
@@ -1017,4 +1017,125 @@ pls_recipe <-
   recipes::step_zv(recipes::all_predictors()) %>% 
   recipes::step_normalize(recipes::all_predictors()) %>%
   recipes::step_pls(recipes::all_predictors(), num_comp = tune::tune() , outcome = "Salary")
+```
+
+## Specify the model
+
+We use a linear model
+
+```{r, message=FALSE}
+
+lm_spec <- 
+  parsnip::linear_reg() %>% 
+  parsnip::set_mode("regression") %>% 
+  parsnip::set_engine("lm")
+
+lm_spec %>%
+  parsnip::translate()
+
+```
+
+## Create the workflow
+
+```{r, message=FALSE}
+
+pls_workflow <-  workflows::workflow() %>% 
+  workflows::add_recipe(pls_recipe) %>% 
+  workflows::add_model(lm_spec)
+
+pls_workflow
+```
+
+## Create the threshold grid
+
+A number of components grid of $10$ numbers from $1$ to $20$ is created.
+
+```{r, message=FALSE}
+
+# Create a range from 10
+num_comp_grid  <- dials::grid_regular(dials::num_comp(range = c(1, 20)), levels = 10)
+
+num_comp_grid %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+## Partial least square regression model fitting on cross validated data
+
+Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res <- tune::tune_grid(
+  object = pls_workflow,
+  resamples = Hitters_fold, 
+  grid = num_comp_grid
+)
+
+tune_res
+```
+
+Here we see how different number of components affects the performance metrics differently. Do note that using a different seed will give a different plot
+
+```{r, message=FALSE}
+# Note that a different seed will give different plots
+tune::autoplot(tune_res)
+```
+
+The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The number of components value is 0.889 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different best number of components value.
+
+```{r, message=FALSE, max.height='150px'}
+
+top_num_comp <- tune::show_best(tune_res, metric = "rmse", n = 5)
+top_num_comp
+
+best_num_comp <- tune::select_best(tune_res, metric = "rmse")
+best_num_comp
+
+```
+
+## Partial least square model with optimised threshold value
+
+We create the partial least square regression workflow with the best threshold.
+
+```{r, message=FALSE}
+
+pls_final <- tune::finalize_workflow(x = pls_workflow, 
+                                     parameters = best_num_comp)
+
+pls_final
+```
+
+We now train the partial least square regression model with the training data.
+
+```{r, message=FALSE}
+
+pls_final_fit <- parsnip::fit(object = pls_final, data = Hitters_train)
+```
+
+## Partial least square regression model on test data
+
+This partial least square regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+
+```{r, message=FALSE}
+
+test_results <- parsnip::augment(x = pls_final_fit, new_data = Hitters_test)
+  
+test_results %>%
+  reactable::reactable(defaultPageSize = 5)
+  
+```
+
+```{r, message=FALSE}
+test_results %>%
+  yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+# Rmarkdown Template
+
+This Rmarkdown template is created by the [Reality Bending Lab](https://realitybending.github.io/). The template can be download from the lab's [github](https://github.com/RealityBending/TemplateResults) repository. For more information about the motivation behind creating this template, check out [Dr. Dominique Makowski's blog post](https://dominiquemakowski.github.io/post/2021-02-10-template_results/)
+
+# Package References
+```{r warning=FALSE, message=TRUE, results='asis'}
+report::cite_packages(sessionInfo())
 ```
