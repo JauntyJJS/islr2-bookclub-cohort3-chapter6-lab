@@ -80,7 +80,9 @@ library(report)
 library(ISLR)
 
 library(reactable)
+library(scales)
 library(ggplot2)
+library(tidytext)
 library(vip)
 
 library(doParallel)
@@ -943,11 +945,7 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-We add [`recipes::step_pca`](https://recipes.tidymodels.org/reference/step_pca.html) this time to perfrom principal component analysis on all the predictors.
-Threshold is the fraction of the total variance that should be covered by the components. 
-
-For the below example, `threshold = .75` means that step_pca should generate enough components to capture 75 percent of the variability in the variables. Note: using this argument will override and reset any value given to `num_comp`.
-
+We add [`recipes::step_pca`](https://recipes.tidymodels.org/reference/step_pca.html) this time to perform principal component analysis on all the predictors.
 
 ```{r, message=FALSE}
 
@@ -957,7 +955,7 @@ pca_recipe <-
   recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
   recipes::step_zv(recipes::all_predictors()) %>% 
   recipes::step_normalize(recipes::all_predictors()) %>%
-  recipes::step_pca(recipes::all_predictors(), threshold = 0.75)
+  recipes::step_pca(recipes::all_predictors())
 ```
 
 ```{r, message=FALSE}
@@ -973,6 +971,100 @@ rec %>%
   reactable::reactable(defaultPageSize = 5)
 
 ```
+
+## PCA exploration
+
+We can explore the results of the PCA using the `recipes::prep` and `recipes::tidy`. We can see that pca is done at step number 5
+
+```{r, message=FALSE}
+
+recipes::prep(x = pca_recipe, training = Hitters_train) %>%
+  recipes::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+As such, we extract the results of step number 5 or the pca step.
+
+```{r, message=FALSE}
+
+tidied_pca <- recipes::prep(x = pca_recipe, training = Hitters_train) %>%
+  recipes::tidy(5)
+
+
+tidied_pca %>%
+  reactable::reactable(defaultPageSize = 5)
+
+```
+
+We make a visualization to see what the first four components look like
+
+```{r, message=FALSE, fig.height = 8}
+
+tidied_pca %>%
+  dplyr::filter(.data[["component"]] %in% c("PC1", "PC2", "PC3", "PC4")) %>%
+  dplyr::mutate(component = forcats::fct_inorder(.data[["component"]])) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["value"]], 
+                                         y = .data[["terms"]], 
+                                         fill = .data[["terms"]])) +
+  ggplot2::geom_col(show.legend = FALSE) +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[["component"]])) +
+  ggplot2::labs(y = NULL)
+
+```
+
+Let us take a closer look at the top 6 variables that contribute to the first four components
+
+```{r, message=FALSE}
+
+tidied_pca %>%
+  dplyr::filter(.data[["component"]] %in% c("PC1", "PC2", "PC3", "PC4")) %>%
+  dplyr::group_by(.data[["component"]]) %>%
+  dplyr::top_n(6, abs(.data[["value"]])) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(
+    terms = tidytext::reorder_within(x = .data[["terms"]], 
+                                     by = abs(.data[["value"]]), 
+                                     within = .data[["component"]])
+    ) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = abs(.data[["value"]]), 
+                                         y = .data[["terms"]], 
+                                         fill = .data[["value"]] > 0)
+                  ) +
+  ggplot2::geom_col() +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[["component"]]), 
+                      scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  ggplot2::labs(
+    x = "Absolute value of contribution to PCA component",
+    y = NULL, 
+    fill = "Positive?"
+  )
+
+```
+
+How much variation are we capturing for each component?
+
+```{r, message=FALSE}
+
+# Get the variance
+pca_prep <- recipes::prep(x = pca_recipe, training = Hitters_train)
+sdev <- pca_prep$steps[[5]]$res$sdev
+percent_variation <- sdev^2 / sum(sdev^2)
+
+# I use [1:4] to select the first four components
+dplyr::tibble(component = unique(tidied_pca$component)[1:4], 
+              percent_var = percent_variation[1:4]) %>%
+  dplyr::mutate(component = forcats::fct_inorder(.data[["component"]])) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["component"]], 
+                                         y = .data[["percent_var"]])) +
+  ggplot2::geom_col() +
+  ggplot2::scale_y_continuous(labels = scales::percent_format()) +
+  ggplot2::labs(x = NULL, 
+                y = "Percent variance explained by each PCA component")
+
+```
+
+Threshold is the fraction of the total variance that should be covered by the components. For example, `threshold = .75` means that step_pca should generate enough components to capture 75 percent of the variability in the variables. Note: using this argument will override and reset any value given to `num_comp`.
 
 We will now try to find the best threshold value using the `tune::tune()`
 
@@ -1048,6 +1140,33 @@ Here we see how different threshold (Variance coverage) affects the performance 
 ```{r, message=FALSE}
 # Note that a different seed will give different plots
 tune::autoplot(tune_res)
+```
+
+We can also see the raw metrics that created this chart by calling `tune::collect_metrics()`.
+
+```{r, message=FALSE, max.height='150px'}
+
+tune::collect_metrics(tune_res) %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Here is the `ggplot` way should `tune::autoplot` fails
+
+```{r, message=FALSE, max.height='150px'}
+
+tune_res %>%
+  tune::collect_metrics() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["threshold"]],
+                                         y = .data[["mean"]],
+                                         colour = .data[[".metric"]])) +
+  ggplot2::geom_errorbar(mapping = ggplot2::aes(ymin = .data[["mean"]] - .data[["std_err"]],
+                                                ymax = .data[["mean"]] + .data[["std_err"]]),
+                         alpha = 0.5) +
+  ggplot2::geom_line(size = 1.5) +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[[".metric"]]), 
+                      scales = "free", 
+                      nrow = 2) +
+  ggplot2::theme(legend.position = "none")
 ```
 
 The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The threshold value is 0.889 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different best number of threshold value.
@@ -1147,7 +1266,7 @@ pls_recipe <-
   recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
   recipes::step_zv(recipes::all_predictors()) %>% 
   recipes::step_normalize(recipes::all_predictors()) %>%
-  recipes::step_pls(recipes::all_predictors(), num_comp = 4, outcome = "Salary")
+  recipes::step_pls(recipes::all_predictors(), num_comp = 19 ,outcome = "Salary")
 ```
 
 ```{r, message=FALSE}
@@ -1164,7 +1283,78 @@ rec %>%
 
 ```
 
-We will now try to find the best threshold value using the `tune::tune()`
+## PLS exploration
+
+We can explore the results of the PCA using the `recipes::prep` and `recipes::tidy`. We can see that pca is done at step number 5
+
+```{r, message=FALSE}
+
+recipes::prep(x = pls_recipe, training = Hitters_train) %>%
+  recipes::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+As such, we extract the results of step number 5 or the pca step.
+
+```{r, message=FALSE}
+
+tidied_pls <- recipes::prep(x = pls_recipe, training = Hitters_train) %>%
+  recipes::tidy(5)
+
+
+tidied_pls %>%
+  reactable::reactable(defaultPageSize = 5)
+
+```
+
+We make a visualization to see what the first four components look like
+
+```{r, message=FALSE, fig.height = 8}
+
+tidied_pls %>%
+  dplyr::filter(.data[["component"]] %in% c("PLS1", "PLS2", "PLS3", "PLS4")) %>%
+  dplyr::mutate(component = forcats::fct_inorder(.data[["component"]])) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["value"]], 
+                                         y = .data[["terms"]], 
+                                         fill = .data[["terms"]])) +
+  ggplot2::geom_col(show.legend = FALSE) +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[["component"]])) +
+  ggplot2::labs(y = NULL)
+
+```
+
+Let us take a closer look at the top 6 variables that contribute to the first four components
+
+```{r, message=FALSE}
+
+tidied_pls %>%
+  dplyr::filter(.data[["component"]] %in% c("PLS1", "PLS2", "PLS3", "PLS4")) %>%
+  dplyr::group_by(.data[["component"]]) %>%
+  dplyr::top_n(6, abs(.data[["value"]])) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(
+    terms = tidytext::reorder_within(x = .data[["terms"]], 
+                                     by = abs(.data[["value"]]), 
+                                     within = .data[["component"]])
+    ) %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = abs(.data[["value"]]), 
+                                         y = .data[["terms"]], 
+                                         fill = .data[["value"]] > 0)
+                  ) +
+  ggplot2::geom_col() +
+  ggplot2::facet_wrap(facets = ggplot2::vars(.data[["component"]]), 
+                      scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  ggplot2::labs(
+    x = "Absolute value of contribution to PLS component",
+    y = NULL, 
+    fill = "Positive?"
+  )
+
+```
+
+`num_comp` is the number of partial least square components to retain as new predictors.
+We will now try to find the best number of component value using the `tune::tune()`
 
 ```{r, message=FALSE}
 
