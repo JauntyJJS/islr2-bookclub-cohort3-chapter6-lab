@@ -15,7 +15,7 @@ output:
     code_folding: show
     code_download: yes
     self_contained: false
-    lib_dir: "rmarkdown_libs"
+    lib_dir: "docs/rmarkdown_libs"
   rmarkdown::html_vignette:
     toc: yes
     toc_depth: 2
@@ -26,6 +26,11 @@ editor_options:
   markdown: 
     wrap: 72
 ---
+
+<!-- 
+!!!! IMPORTANT: run `source("utils/render.R")` to publish instead of clicking on 'Knit'
+# See https://yihui.org/knitr/options/
+-->
 
 ```{r setup, warning=FALSE, message=TRUE, include=FALSE}
 # Set up the environment
@@ -56,7 +61,7 @@ knitr::knit_hooks$set(
 knitr::opts_chunk$set(
   comment = ">",  # The prefix to be added before each line of the text output.
   dpi = 600,
-  fig.path = "img/",
+  fig.path = "figures/",
   fig.height = figheight,
   fig.width = figwidth,
   fig.align = "center",
@@ -67,13 +72,23 @@ knitr::opts_chunk$set(
   tidy='styler',
   tidy.opts=list(strict=TRUE)
 )
+
+htmltools::tagList(
+  xaringanExtra::use_clipboard(
+    button_text = "<i class=\"fa fa-clipboard\"></i> Copy Code",
+    success_text = "<i class=\"fa fa-check\" style=\"color: #90BE6D\"></i> Copied!",
+  ),
+  rmarkdown::html_dependency_font_awesome()
+)
 ```
 
 ```{r warning=FALSE, message=FALSE, results='asis', class.source = 'fold-hide'}
 # Rmarkdown stuff
 library(rmarkdown, quietly=TRUE)
 library(knitr, quietly=TRUE)
+library(htmltools, quietly=TRUE)
 library(styler, quietly=TRUE)
+library(xaringanExtra, quietly=TRUE)
 
 # Dataset
 library(ISLR, quietly=TRUE)
