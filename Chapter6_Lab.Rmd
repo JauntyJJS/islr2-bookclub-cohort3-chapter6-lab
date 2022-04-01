@@ -70,38 +70,62 @@ knitr::opts_chunk$set(
 ```
 
 ```{r warning=FALSE, message=FALSE, results='asis'}
-library(leaps)
-library(tibble)
-library(magrittr)
-library(dplyr)
-library(tidyr)
-library(forcats)
-library(report)
-library(ISLR)
+# Rmarkdown stuff
+library(rmarkdown, quietly=TRUE)
+library(knitr, quietly=TRUE)
+library(styler, quietly=TRUE)
 
-library(reactable)
-library(scales)
-library(ggplot2)
-library(tidytext)
-library(vip)
+# Dataset
+library(ISLR, quietly=TRUE)
 
-library(doParallel)
+# Session info and package reporting
+library(report, quietly=TRUE)
 
-library(parsnip)
-library(glmnet)
-library(rsample)
-library(recipes)
-library(tune)
-library(workflows)
-library(dials)
-library(yardstick)
+# Data wrangling
 
-# For recipes::step_pls
+library(dplyr, quietly=TRUE)
+library(tidyr, quietly=TRUE)
+library(magrittr, quietly=TRUE)
+
+# Create interactive tables
+library(reactable, quietly=TRUE)
+
+# For plotting
+
+library(forcats, quietly=TRUE)
+library(scales, quietly=TRUE)
+library(tidytext, quietly=TRUE)
+library(ggplot2, quietly=TRUE)
+
+# For parallel processing for tuning
+library(doParallel, quietly=TRUE)
+
+# For applying tidymodels
+
+library(rsample, quietly=TRUE)
+library(parsnip, quietly=TRUE)
+library(recipes, quietly=TRUE)
+library(dials, quietly=TRUE)
+library(tune, quietly=TRUE)
+library(workflows, quietly=TRUE)
+library(dials, quietly=TRUE)
+library(yardstick, quietly=TRUE)
+
+# For subset selection
+library(leaps, quietly=TRUE)
+
+# For ridge regression and lasso
+library(glmnet, quietly=TRUE)
+
+# For partial least square regression
+# In recipes::step_pls
 # Warning message:
 #  `step_pls()` failed: Error in loadNamespace(x) : there is no package called ‘mixOmics’
 # Install from Bioconductor
-library(mixOmics)
+library(mixOmics, quietly=TRUE)
 
+# For variable importance
+library(vip, quietly=TRUE)
 
 summary(report::report(sessionInfo()))
 ```
@@ -122,11 +146,14 @@ Remove all rows with missing data from that column.
 
 ```{r, message=FALSE}
 
-Hitters <- as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
   tidyr::drop_na()
+
+Hitters %>%
+  reactable::reactable(defaultPageSize = 5)
 ```
 
-Use `regsubsets()` function to performs best subset selection.
+Use `leaps::regsubsets` function to performs best subset selection.
 
 An asterisk indicates that a given variable is included in the
 corresponding model. For instance, this output indicates that the best
@@ -154,7 +181,7 @@ regfit.full <- leaps::regsubsets(
   )
 ```
 
-The `summary()` function also returns $R^2$, $RSS$, adjusted $R^2$,
+The `summary` function also returns $R^2$, $RSS$, adjusted $R^2$,
 $C_p$, and $BIC$. We can examine these to try to select the best overall
 model.
 
@@ -176,7 +203,7 @@ monotonically as more variables are included.
 reg.summary$rsq
 ```
 
-The `regsubsets()` function has a built-in `plot()` command which can be
+The `leaps::regsubsets` function has a built-in `plot` command which can be
 used to display the selected variables for the best model with a given
 number of predictors, ranked according to the $BIC$, $C_p$, adjusted
 $R^2$, or $AIC$. To find out more about this function, type
@@ -193,7 +220,7 @@ contains only `AtBat`, `Hits`, `Walks`, `CRBI`, `DivisionW`, and
 plot(regfit.full , scale = "bic")
 ```
 
-We can use the `coef()` function to see the coefficient estimates
+We can use the `coef` function to see the coefficient estimates
 associated with this model.
 
 ```{r, message=FALSE}
@@ -202,7 +229,7 @@ coef(regfit.full , 6)
 
 ## Forward and Backward Stepwise Selection
 
-We can also use the `regsubsets()` function to perform forward stepwise
+We can also use the `leaps::regsubsets` function to perform forward stepwise
 selection using the argument `method = "forward"`
 
 ```{r, message=FALSE, max.height='150px'}
@@ -268,7 +295,7 @@ test <- Hitters %>%
 
 ```
 
-Now, we apply `regsubsets()` to the training set in order to perform
+Now, we apply `leaps::regsubsets` to the training set in order to perform
 best subset selection and compute the the validation set error for the
 best model of each model size.
 
@@ -325,7 +352,7 @@ We write a for loop that performs cross-validation
 
 ```{r, message=FALSE}
 
-# A predict method for regsubsets
+# A predict method for leaps::regsubsets
 predict.regsubsets <- function(object , newdata , id, ...) {
   form <- as.formula(object$call [[2]])
   mat <- model.matrix(form , newdata)
@@ -352,8 +379,8 @@ This has given us a $10$ by $19$ matrix, of which the $(j, i)$th element
 corresponds to the test $MSE$ for the $j$th cross-validation fold for
 the best $i$-variable model.
 
-We use the `apply()` function to average over the columns of this
-`apply()` matrix in order to obtain a vector for which the $i$th element
+We use the `apply` function to average over the columns of this
+`apply` matrix in order to obtain a vector for which the $i$th element
 is the cross validation error for the $i$-variable model.
 
 ```{r, message=FALSE}
@@ -375,11 +402,15 @@ coef(regfit.best , 10)
 
 ## Introduction to ridge regression 
 
-Set mixture to 0 to indicate Ridge Regression. For now, we set
-penalty/lambda as 0
+Use [`parsnip::linear_reg`](https://parsnip.tidymodels.org/reference/linear_reg.html), [`parsnip::set_mode`](https://parsnip.tidymodels.org/reference/set_args.html) and
+[`parsnip::set_engine`](https://parsnip.tidymodels.org/reference/set_engine.html) to create the model.
+
+Set mixture to 0 to indicate Ridge Regression. For now, we set penalty/lambda as 0.
+
+Use [`parsnip::translate`](https://parsnip.tidymodels.org/reference/translate.html) to better understand the model created.
 
 ```{r, message=FALSE}
-Hitters <- as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
   tidyr::drop_na()
 
 ridge_spec <- parsnip::linear_reg(mixture = 0,
@@ -391,7 +422,7 @@ ridge_spec %>%
   parsnip::translate()
 ```
 
-Once the specification is created we can fit it to our data. We will use
+Once the specification is created we can fit it to our data using [`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html). We will use
 all the predictors.
 
 ```{r, message=FALSE}
@@ -402,7 +433,7 @@ ridge_fit <- ridge_spec %>%
 ```
 
 We can see the parameter estimate for different values of
-penalty/lambda. Notice how the estimates are decreasing when the amount
+penalty/lambda with [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html). Notice how the estimates are decreasing when the amount
 of penalty goes up
 
 ```{r, message=FALSE, max.height='150px'}
@@ -414,7 +445,7 @@ parsnip::tidy(ridge_fit, penalty = 11498) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-We can visualize how the magnitude of the coefficients are being
+Using [`parsnip::extract_fit_engine`](https://parsnip.tidymodels.org/reference/extract-parsnip.html) we can visualize how the magnitude of the coefficients are being
 regularized towards zero as the penalty goes up.
 
 ```{r, message=FALSE}
@@ -426,9 +457,9 @@ ridge_fit %>%
 ```
 
 It would be nice if we could find the "best" value of the
-penalty/lambda. We can do this using the `tune::tune_grid()`
+penalty/lambda. We can do this using the [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
 
-Need we need three things in order to use the `tune::tune_grid()`
+Need we need three things in order to use the [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
 
 -   a `resample` object containing the resamples the `workflow` should be
     fitted within,
@@ -437,14 +468,14 @@ Need we need three things in order to use the `tune::tune_grid()`
 
 -   a tibble `penalty_grid` containing the parameter values to be evaluated.
 
-First, we create a 10-fold cross-validation data set from the training
-data set.
-
 ## Create the resample object
+
+First, we create a 10-fold cross-validation data set from the training
+data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
 
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -460,7 +491,9 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 We use the `recipes` package to create the preporcessing steps. However, the order of the preprocessing step is actually important. See the [Ordering of steps vignette](https://cran.r-project.org/web/packages/recipes/vignettes/Ordering.html) 
 
-We create a basic recipe.
+We create a basic recipe with [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html).
+
+Apply [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and [`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to compute the preprocessing step.
 
 ```{r, message=FALSE}
 
@@ -479,7 +512,7 @@ rec %>%
 
 ```
 
-Do preprocessing on the factor variables.
+Do preprocessing on the factor variables [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html). [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html) and [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html) was used.
 
 ```{r, message=FALSE}
 
@@ -504,7 +537,7 @@ rec %>%
 
 ```
 
-Do normalisation step.
+Do normalisation step on all predictors [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html). [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html) was used.
 
 ```{r, message=FALSE}
 
@@ -525,7 +558,7 @@ rec %>%
 
 ## Specify the model
 
-The model specification will look very similar to what we have seen earlier, but we will set `penalty = tune::tune()`. This tells `tune::tune_grid()` that the penalty parameter should be tuned.
+The model specification will look very similar to what we have seen earlier, but we will set `penalty = tune::tune`. This tells [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html) that the penalty parameter should be tuned using [`tune::tune`](https://hardhat.tidymodels.org/reference/tune.html).
 
 ```{r, message=FALSE}
 
@@ -707,13 +740,16 @@ test_results %>%
 
 # The Lasso
 
-The following procedure will be very similar to what we saw in the ridge regression section. The resampling step is the same
+The following procedure will be very similar to what we saw in the ridge regression section. The resampling step is the same.
 
 ## Create the resample object
 
+First, we create a 10-fold cross-validation data set from the training
+data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -727,7 +763,7 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-The following procedure will be very similar to what we saw in the ridge regression section. The preprocessing needed is the same.
+The following procedure will be very similar to what we saw in the ridge regression section. The preprocessing steps needed are the same using [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html), [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html), [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html), [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
 
 ```{r, message=FALSE}
 
@@ -741,7 +777,9 @@ lasso_recipe <-
 
 ## Specify the model
 
-This time, it is `mixture=1`
+Again we set `penalty = tune::tune`. This tells [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html) that the penalty parameter should be tuned using [`tune::tune`](https://hardhat.tidymodels.org/reference/tune.html).
+
+This time, it is `mixture=1` in [`parsnip::linear_reg`](https://parsnip.tidymodels.org/reference/linear_reg.html)
 
 ```{r, message=FALSE}
 
@@ -929,9 +967,12 @@ The principal component regression is a linear model with pca transformed data. 
 
 ## Create the resample object
 
+First, we create a 10-fold cross-validation data set from the training
+data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -945,6 +986,8 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
+We create a recipe with [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html), [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html), [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html), [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
+
 We add [`recipes::step_pca`](https://recipes.tidymodels.org/reference/step_pca.html) this time to perform principal component analysis on all the predictors.
 
 ```{r, message=FALSE}
@@ -957,6 +1000,8 @@ pca_recipe <-
   recipes::step_normalize(recipes::all_predictors()) %>%
   recipes::step_pca(recipes::all_predictors())
 ```
+
+Apply [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and [`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to compute the preprocessing step.
 
 ```{r, message=FALSE}
 
@@ -1066,7 +1111,7 @@ dplyr::tibble(component = unique(tidied_pca$component)[1:4],
 
 Threshold is the fraction of the total variance that should be covered by the components. For example, `threshold = .75` means that step_pca should generate enough components to capture 75 percent of the variability in the variables. Note: using this argument will override and reset any value given to `num_comp`.
 
-We will now try to find the best threshold value using the `tune::tune()`
+We will now try to find the best threshold value using the [`tune::tune()`](https://hardhat.tidymodels.org/reference/tune.html)
 
 ```{r, message=FALSE}
 
@@ -1238,9 +1283,12 @@ The partial least square regression is a linear model with pls transformed data.
 
 ## Create the resample object
 
+First, we create a 10-fold cross-validation data set from the training
+data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -1253,6 +1301,8 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 ```
 
 ## Create the preprocessor
+
+We create a recipe with [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html), [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html), [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html), [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
 
 We add [`recipes::step_pls`](https://recipes.tidymodels.org/reference/step_pls.html) this time to perform partial least square calculation on all the predictors.
 `num_comp` is the number of partial least square components to retain as new predictors.
@@ -1268,6 +1318,8 @@ pls_recipe <-
   recipes::step_normalize(recipes::all_predictors()) %>%
   recipes::step_pls(recipes::all_predictors(), num_comp = 19 ,outcome = "Salary")
 ```
+
+Apply [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and [`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to compute the preprocessing step.
 
 ```{r, message=FALSE}
 
@@ -1354,7 +1406,7 @@ tidied_pls %>%
 ```
 
 `num_comp` is the number of partial least square components to retain as new predictors.
-We will now try to find the best number of component value using the `tune::tune()`
+We will now try to find the best number of component value using the [`tune::tune()`](https://hardhat.tidymodels.org/reference/tune.html)
 
 ```{r, message=FALSE}
 
