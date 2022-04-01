@@ -69,7 +69,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r warning=FALSE, message=FALSE, results='asis'}
+```{r warning=FALSE, message=FALSE, results='asis', class.source = 'fold-hide'}
 # Rmarkdown stuff
 library(rmarkdown, quietly=TRUE)
 library(knitr, quietly=TRUE)
@@ -98,10 +98,12 @@ library(tidytext, quietly=TRUE)
 library(ggplot2, quietly=TRUE)
 
 # For parallel processing for tuning
+library(foreach, quietly=TRUE)
 library(doParallel, quietly=TRUE)
 
 # For applying tidymodels
 
+library(broom, quietly=TRUE)
 library(rsample, quietly=TRUE)
 library(parsnip, quietly=TRUE)
 library(recipes, quietly=TRUE)
@@ -181,9 +183,8 @@ regfit.full <- leaps::regsubsets(
   )
 ```
 
-The `summary` function also returns $R^2$, $RSS$, adjusted $R^2$,
-$C_p$, and $BIC$. We can examine these to try to select the best overall
-model.
+The `summary` function also returns $R^2$, $RSS$, adjusted $R^2$, $C_p$,
+and $BIC$. We can examine these to try to select the best overall model.
 
 ```{r, message=FALSE}
 
@@ -203,10 +204,10 @@ monotonically as more variables are included.
 reg.summary$rsq
 ```
 
-The `leaps::regsubsets` function has a built-in `plot` command which can be
-used to display the selected variables for the best model with a given
-number of predictors, ranked according to the $BIC$, $C_p$, adjusted
-$R^2$, or $AIC$. To find out more about this function, type
+The `leaps::regsubsets` function has a built-in `plot` command which can
+be used to display the selected variables for the best model with a
+given number of predictors, ranked according to the $BIC$, $C_p$,
+adjusted $R^2$, or $AIC$. To find out more about this function, type
 `?plot.regsubsets`.
 
 The top row of each plot contains a black square for each variable
@@ -229,8 +230,8 @@ coef(regfit.full , 6)
 
 ## Forward and Backward Stepwise Selection
 
-We can also use the `leaps::regsubsets` function to perform forward stepwise
-selection using the argument `method = "forward"`
+We can also use the `leaps::regsubsets` function to perform forward
+stepwise selection using the argument `method = "forward"`
 
 ```{r, message=FALSE, max.height='150px'}
 regfit.fwd <- leaps::regsubsets(
@@ -295,9 +296,9 @@ test <- Hitters %>%
 
 ```
 
-Now, we apply `leaps::regsubsets` to the training set in order to perform
-best subset selection and compute the the validation set error for the
-best model of each model size.
+Now, we apply `leaps::regsubsets` to the training set in order to
+perform best subset selection and compute the the validation set error
+for the best model of each model size.
 
 ```{r, message=FALSE}
 
@@ -379,9 +380,9 @@ This has given us a $10$ by $19$ matrix, of which the $(j, i)$th element
 corresponds to the test $MSE$ for the $j$th cross-validation fold for
 the best $i$-variable model.
 
-We use the `apply` function to average over the columns of this
-`apply` matrix in order to obtain a vector for which the $i$th element
-is the cross validation error for the $i$-variable model.
+We use the `apply` function to average over the columns of this `apply`
+matrix in order to obtain a vector for which the $i$th element is the
+cross validation error for the $i$-variable model.
 
 ```{r, message=FALSE}
 
@@ -400,14 +401,21 @@ coef(regfit.best , 10)
 
 # Ridge Regression
 
-## Introduction to ridge regression 
+## Introduction to ridge regression
 
-Use [`parsnip::linear_reg`](https://parsnip.tidymodels.org/reference/linear_reg.html), [`parsnip::set_mode`](https://parsnip.tidymodels.org/reference/set_args.html) and
-[`parsnip::set_engine`](https://parsnip.tidymodels.org/reference/set_engine.html) to create the model.
+Use
+[`parsnip::linear_reg`](https://parsnip.tidymodels.org/reference/linear_reg.html),
+[`parsnip::set_mode`](https://parsnip.tidymodels.org/reference/set_args.html)
+and
+[`parsnip::set_engine`](https://parsnip.tidymodels.org/reference/set_engine.html)
+to create the model.
 
-Set mixture to 0 to indicate Ridge Regression. For now, we set penalty/lambda as 0.
+Set mixture to 0 to indicate Ridge Regression. For now, we set
+penalty/lambda as 0.
 
-Use [`parsnip::translate`](https://parsnip.tidymodels.org/reference/translate.html) to better understand the model created.
+Use
+[`parsnip::translate`](https://parsnip.tidymodels.org/reference/translate.html)
+to better understand the model created.
 
 ```{r, message=FALSE}
 Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
@@ -422,8 +430,9 @@ ridge_spec %>%
   parsnip::translate()
 ```
 
-Once the specification is created we can fit it to our data using [`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html). We will use
-all the predictors.
+Once the specification is created we can fit it to our data using
+[`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html). We
+will use all the predictors.
 
 ```{r, message=FALSE}
 ridge_fit <- ridge_spec %>%
@@ -432,9 +441,11 @@ ridge_fit <- ridge_spec %>%
 
 ```
 
-We can see the parameter estimate for different values of
-penalty/lambda with [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html). Notice how the estimates are decreasing when the amount
-of penalty goes up
+We can see the parameter estimate for different values of penalty/lambda
+with
+[`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html).
+Notice how the estimates are decreasing when the amount of penalty goes
+up
 
 ```{r, message=FALSE, max.height='150px'}
 parsnip::tidy(ridge_fit) %>%
@@ -445,7 +456,9 @@ parsnip::tidy(ridge_fit, penalty = 11498) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Using [`parsnip::extract_fit_engine`](https://parsnip.tidymodels.org/reference/extract-parsnip.html) we can visualize how the magnitude of the coefficients are being
+Using
+[`parsnip::extract_fit_engine`](https://parsnip.tidymodels.org/reference/extract-parsnip.html)
+we can visualize how the magnitude of the coefficients are being
 regularized towards zero as the penalty goes up.
 
 ```{r, message=FALSE}
@@ -457,21 +470,29 @@ ridge_fit %>%
 ```
 
 It would be nice if we could find the "best" value of the
-penalty/lambda. We can do this using the [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
+penalty/lambda. We can do this using the
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
 
-Need we need three things in order to use the [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
+Need we need three things in order to use the
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
 
--   a `resample` object containing the resamples the `workflow` should be
-    fitted within,
-    
+-   a `resample` object containing the resamples the `workflow` should
+    be fitted within,
+
 -   a `workflow` object containing the model and preprocessor,and
 
--   a tibble `penalty_grid` containing the parameter values to be evaluated.
+-   a tibble `penalty_grid` containing the parameter values to be
+    evaluated.
 
 ## Create the resample object
 
 First, we create a 10-fold cross-validation data set from the training
-data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+data set with
+[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
+and
+[`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
 
 ```{r, message=FALSE}
 set.seed(1234)
@@ -489,11 +510,19 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-We use the `recipes` package to create the preporcessing steps. However, the order of the preprocessing step is actually important. See the [Ordering of steps vignette](https://cran.r-project.org/web/packages/recipes/vignettes/Ordering.html) 
+We use the `recipes` package to create the preporcessing steps. However,
+the order of the preprocessing step is actually important. See the
+[Ordering of steps
+vignette](https://cran.r-project.org/web/packages/recipes/vignettes/Ordering.html)
 
-We create a basic recipe with [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html).
+We create a basic recipe with
+[`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html).
 
-Apply [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and [`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to compute the preprocessing step.
+Apply
+[`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html)
+and
+[`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to
+compute the preprocessing step.
 
 ```{r, message=FALSE}
 
@@ -512,7 +541,12 @@ rec %>%
 
 ```
 
-Do preprocessing on the factor variables [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html). [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html) and [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html) was used.
+Do preprocessing on the factor variables
+[`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html).
+[`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html)
+and
+[`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html)
+was used.
 
 ```{r, message=FALSE}
 
@@ -537,7 +571,12 @@ rec %>%
 
 ```
 
-Do normalisation step on all predictors [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html). [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html) was used.
+Do normalisation step on all predictors
+[`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html).
+[`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html)
+and
+[`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html)
+was used.
 
 ```{r, message=FALSE}
 
@@ -558,7 +597,11 @@ rec %>%
 
 ## Specify the model
 
-The model specification will look very similar to what we have seen earlier, but we will set `penalty = tune::tune`. This tells [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html) that the penalty parameter should be tuned using [`tune::tune`](https://hardhat.tidymodels.org/reference/tune.html).
+The model specification will look very similar to what we have seen
+earlier, but we will set `penalty = tune::tune`. This tells
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
+that the penalty parameter should be tuned using
+[`tune::tune`](https://hardhat.tidymodels.org/reference/tune.html).
 
 ```{r, message=FALSE}
 
@@ -573,6 +616,12 @@ ridge_spec %>%
 
 ## Create the workflow
 
+[`workflows::workflow`](https://workflows.tidymodels.org/reference/workflow.html),
+[`workflows::add_recipe`](https://workflows.tidymodels.org/reference/add_recipe.html)
+and
+[`workflows::add_model`](https://workflows.tidymodels.org/reference/add_model.html)
+are used.
+
 ```{r, message=FALSE, max.height='150px'}
 
 ridge_workflow <-  workflows::workflow() %>% 
@@ -584,12 +633,22 @@ ridge_workflow
 
 ## Create the penalty/lambda grid
 
-A penalty/lambda grid of $50$ numbers from $0.00001$ ($10^{-5}$) to $10000$ ($10^5$) is created.
+A penalty/lambda grid of $50$ numbers from $0.00001$ ($10^{-5}$) to
+$10000$ ($10^5$) is created.
+
+Regular grid is created using
+[`dials::grid_regular`](https://dials.tidymodels.org/reference/grid_regular.html),
+[`dials::penalty`](https://dials.tidymodels.org/reference/penalty.html)
+and
+[`scales::log10_trans`](https://scales.r-lib.org/reference/log_trans.html)
 
 ```{r, message=FALSE}
 
 # Create a range from 10
-penalty_grid <- dials::grid_regular(dials::penalty(range = c(-5, 5)), levels = 50)
+penalty_grid <- dials::grid_regular(x = dials::penalty(range = c(-5, 5),
+                                                       trans = scales::log10_trans()
+                                                       ), 
+                                    levels = 50)
 
 penalty_grid  %>% 
   reactable::reactable(defaultPageSize = 5)
@@ -597,11 +656,17 @@ penalty_grid  %>%
 
 ## Ridge regression model fitting on cross validated data
 
-Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+Now we have everything we need and we can fit all the models on the
+cross validated data with
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html).
+Note that this process may take some time.
+
+```{r, message=FALSE}
+doParallel::registerDoParallel()
+foreach::getDoParWorkers()
+```
 
 ```{r, message=FALSE, max.height='150px'}
-doParallel::registerDoParallel()
-
 tune_res <- tune::tune_grid(
   object = ridge_workflow,
   resamples = Hitters_fold, 
@@ -611,14 +676,18 @@ tune_res <- tune::tune_grid(
 tune_res
 ```
 
-Here we see that the amount of regularization affects the performance metrics differently. Do note that using a different seed will give a different plot
+Here we see that the amount of regularization affects the performance
+metrics differently using
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html).
+Do note that using a different seed will give a different plot
 
 ```{r, message=FALSE}
 # Note that a different seed will give different plots
 tune::autoplot(tune_res)
 ```
 
-We can also see the raw metrics that created this chart by calling `tune::collect_metrics()`.
+We can also see the raw metrics that created this chart by calling
+[`tune::collect_metrics()`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -626,7 +695,9 @@ tune::collect_metrics(tune_res) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Here is the `ggplot` way should `tune::autoplot` fails
+Here is the `ggplot` way should
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html)
+fails
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -646,7 +717,16 @@ tune_res %>%
   ggplot2::theme(legend.position = "none")
 ```
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 569 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different best penalty/lambda value.
+Use
+[`tune::show_best`](https://tune.tidymodels.org/reference/show_best.html)
+to see the top few values for a given metric.
+
+The "best" values can be selected using
+[`tune::select_best`](https://tune.tidymodels.org/reference/show_best.html),
+this function requires you to specify a metric that it should select
+against. The penalty/lambda value is 569 for metric `rsq` since it gives
+the highest value. Do note that using a different seed will give a
+different best penalty/lambda value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -660,7 +740,9 @@ best_penalty
 
 ## Ridge regression model with optimised penalty/lambda value
 
-We create the ridge regression workflow with the best penalty score.
+We create the ridge regression workflow with the best penalty score
+using
+[`tune::finalize_workflow`](https://tune.tidymodels.org/reference/finalize_model.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -670,16 +752,30 @@ ridge_final <- tune::finalize_workflow(x = ridge_workflow,
 ridge_final
 ```
 
-We now train the ridge regression model with the training data
+We now train the ridge regression model with the training data using
+[`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html)
 
 ```{r, message=FALSE}
 
 ridge_final_fit <- parsnip::fit(object = ridge_final, data = Hitters_train)
 ```
 
+We can see the coefficients using
+[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html) and [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html)
+
+```{r, message=FALSE}
+
+ridge_final_fit %>%
+  tune::extract_fit_parsnip() %>%
+  parsnip::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
 ## Variable Importance
 
-While we’re at it, let’s see what the most important variables are using the `vip` package.
+While we're at it, let's see what the most important variables are using
+the `vip` package and
+[`workflows::extract_fit_parsnip`](https://workflows.tidymodels.org/reference/extract-workflow.html).
 
 ```{r, message=FALSE}
 
@@ -708,7 +804,11 @@ vip_table %>%
 
 ## Ridge regression model on test data
 
-This ridge regression model can now be applied on our testing data set to validate its performance. For regression models, a `.pred` column is added.
+This ridge regression model can now be applied on our testing data set
+to validate its performance. For regression models, a `.pred` column is
+added when
+[`parsnip::augment`](https://parsnip.tidymodels.org/reference/augment.html)
+is used.
 
 ```{r, message=FALSE}
 
@@ -719,13 +819,19 @@ test_results %>%
   
 ```
 
+We check how well the `.pred` column matches the Salary using
+[`yardstick::rsq`](https://yardstick.tidymodels.org/reference/rsq.html).
+
 ```{r, message=FALSE}
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+Alternatively, we can use
+[`tune::last_fit`](https://tune.tidymodels.org/reference/last_fit.html)
+and
+[`tune::collect_metrics`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE}
 
@@ -740,12 +846,18 @@ test_results %>%
 
 # The Lasso
 
-The following procedure will be very similar to what we saw in the ridge regression section. The resampling step is the same.
+The following procedure will be very similar to what we saw in the ridge
+regression section. The resampling step is the same.
 
 ## Create the resample object
 
 First, we create a 10-fold cross-validation data set from the training
-data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+data set with
+[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
+and
+[`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
 
 ```{r, message=FALSE}
 set.seed(1234)
@@ -763,7 +875,16 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-The following procedure will be very similar to what we saw in the ridge regression section. The preprocessing steps needed are the same using [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html), [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html), [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html), [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
+The following procedure will be very similar to what we saw in the ridge
+regression section. The preprocessing steps needed are the same using
+[`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html),
+[`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html),
+[`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html),
+[`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html),
+[`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html),
+[`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html)
+and
+[`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
 
 ```{r, message=FALSE}
 
@@ -777,9 +898,13 @@ lasso_recipe <-
 
 ## Specify the model
 
-Again we set `penalty = tune::tune`. This tells [`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html) that the penalty parameter should be tuned using [`tune::tune`](https://hardhat.tidymodels.org/reference/tune.html).
+Again we set `penalty = tune::tune`. This tells
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html)
+that the penalty parameter should be tuned using
+[`tune::tune`](https://hardhat.tidymodels.org/reference/tune.html).
 
-This time, it is `mixture=1` in [`parsnip::linear_reg`](https://parsnip.tidymodels.org/reference/linear_reg.html)
+This time, it is `mixture=1` in
+[`parsnip::linear_reg`](https://parsnip.tidymodels.org/reference/linear_reg.html)
 
 ```{r, message=FALSE}
 
@@ -795,6 +920,12 @@ lasso_spec %>%
 
 ## Create the workflow
 
+[`workflows::workflow`](https://workflows.tidymodels.org/reference/workflow.html),
+[`workflows::add_recipe`](https://workflows.tidymodels.org/reference/add_recipe.html)
+and
+[`workflows::add_model`](https://workflows.tidymodels.org/reference/add_model.html)
+are used.
+
 ```{r, message=FALSE, max.height='150px'}
 
 lasso_workflow <-  workflows::workflow() %>% 
@@ -806,13 +937,20 @@ lasso_workflow
 
 ## Create the penalty/lambda grid
 
-A penalty/lambda grid of $50$ numbers from $0.01$ ($10^{-2}$) to $100$ ($10^2$) is created.
+A penalty/lambda grid of $50$ numbers from $0.01$ ($10^{-2}$) to $100$
+($10^2$) is created.
+
+Regular grid is created using
+[`dials::grid_regular`](https://dials.tidymodels.org/reference/grid_regular.html),
+[`dials::penalty`](https://dials.tidymodels.org/reference/penalty.html)
+and
+[`scales::log10_trans`](https://scales.r-lib.org/reference/log_trans.html)
 
 ```{r, message=FALSE}
-doParallel::registerDoParallel()
-
 # Create a range from 10
-penalty_grid <- dials::grid_regular(dials::penalty(range = c(-2, 2)), levels = 50)
+penalty_grid <- dials::grid_regular(x = dials::penalty(range = c(-2, 2),
+                                                       trans = scales::log10_trans()),  
+                                    levels = 50)
 
 penalty_grid  %>% 
   reactable::reactable(defaultPageSize = 5)
@@ -820,10 +958,17 @@ penalty_grid  %>%
 
 ## Lasso model fitting on cross validated data
 
-Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+Now we have everything we need and we can fit all the models on the
+cross validated data with
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html).
+Note that this process may take some time.
+
+```{r, message=FALSE}
+doParallel::registerDoParallel()
+foreach::getDoParWorkers()
+```
 
 ```{r, message=FALSE, max.height='150px'}
-
 tune_res <- tune::tune_grid(
   object = lasso_workflow,
   resamples = Hitters_fold, 
@@ -833,14 +978,18 @@ tune_res <- tune::tune_grid(
 tune_res
 ```
 
-Here we see that the amount of regularization affects the performance metrics differently. Do note that using a different seed will give a different plot
+Here we see that the amount of regularization affects the performance
+metrics differently using
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html).
+Do note that using a different seed will give a different plot
 
 ```{r, message=FALSE}
 # Note that a different seed will give different plots
 tune::autoplot(tune_res)
 ```
 
-We can also see the raw metrics that created this chart by calling `tune::collect_metrics()`.
+We can also see the raw metrics that created this chart by calling
+[`tune::collect_metrics()`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -848,7 +997,9 @@ tune::collect_metrics(tune_res) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Here is the `ggplot` way should `tune::autoplot` fails
+Here is the `ggplot` way should
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html)
+fails
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -868,8 +1019,16 @@ tune_res %>%
   ggplot2::theme(legend.position = "none")
 ```
 
+Use
+[`tune::show_best`](https://tune.tidymodels.org/reference/show_best.html)
+to see the top few values for a given metric.
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The penalty/lambda value is 22.2 for metric `rsq` since it gives the highest value. Do note that using a different seed will give a different best penalty/lambda value.
+The "best" values can be selected using
+[`tune::select_best`](https://tune.tidymodels.org/reference/show_best.html),
+this function requires you to specify a metric that it should select
+against. The penalty/lambda value is 22.2 for metric `rsq` since it
+gives the highest value. Do note that using a different seed will give a
+different best penalty/lambda value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -883,7 +1042,9 @@ best_penalty
 
 ## Lasso model with optimised penalty/lambda value
 
-We create the lasso regression workflow with the best penalty score.
+We create the lasso regression workflow with the best penalty score
+using
+[`tune::finalize_workflow`](https://tune.tidymodels.org/reference/finalize_model.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -893,16 +1054,30 @@ lasso_final <- tune::finalize_workflow(x = lasso_workflow,
 lasso_final
 ```
 
-We now train the lasso regression model with the training data
+We now train the lasso regression model with the training data using
+[`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html)
 
 ```{r, message=FALSE}
 
 lasso_final_fit <- parsnip::fit(object = lasso_final, data = Hitters_train)
 ```
 
+We can see the coefficients using
+[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html) and [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html)
+
+```{r, message=FALSE}
+
+lasso_final_fit %>%
+  tune::extract_fit_parsnip() %>%
+  parsnip::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
 ## Variable Importance
 
-While we’re at it, let’s see what the most important variables are using the `vip` package.
+While we're at it, let's see what the most important variables are using
+the `vip` package and
+[`workflows::extract_fit_parsnip`](https://workflows.tidymodels.org/reference/extract-workflow.html).
 
 ```{r, message=FALSE}
 
@@ -931,7 +1106,11 @@ vip_table %>%
 
 ## Lasso regression model on test data
 
-This lasso regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+This lasso regression model can now be applied on our testing data set
+to validate its performance. For regression models, a .pred column is
+added when
+[`parsnip::augment`](https://parsnip.tidymodels.org/reference/augment.html)
+is used.
 
 ```{r, message=FALSE}
 
@@ -942,13 +1121,19 @@ test_results %>%
   
 ```
 
+We check how well the `.pred` column matches the Salary using
+[`yardstick::rsq`](https://yardstick.tidymodels.org/reference/rsq.html).
+
 ```{r, message=FALSE}
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+Alternatively, we can use
+[`tune::last_fit`](https://tune.tidymodels.org/reference/last_fit.html)
+and
+[`tune::collect_metrics`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE}
 
@@ -963,12 +1148,19 @@ test_results %>%
 
 # Principal Components Regression
 
-The principal component regression is a linear model with pca transformed data. Hence, the major changes will be on the preprocessing steps.
+The principal component regression is a linear model with pca
+transformed data. Hence, the major changes will be on the preprocessing
+steps.
 
 ## Create the resample object
 
 First, we create a 10-fold cross-validation data set from the training
-data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+data set with
+[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
+and
+[`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
 
 ```{r, message=FALSE}
 set.seed(1234)
@@ -986,9 +1178,19 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-We create a recipe with [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html), [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html), [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html), [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
+We create a recipe with
+[`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html),
+[`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html),
+[`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html),
+[`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html),
+[`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html),
+[`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html)
+and
+[`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
 
-We add [`recipes::step_pca`](https://recipes.tidymodels.org/reference/step_pca.html) this time to perform principal component analysis on all the predictors.
+We add
+[`recipes::step_pca`](https://recipes.tidymodels.org/reference/step_pca.html)
+this time to perform principal component analysis on all the predictors.
 
 ```{r, message=FALSE}
 
@@ -1001,7 +1203,11 @@ pca_recipe <-
   recipes::step_pca(recipes::all_predictors())
 ```
 
-Apply [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and [`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to compute the preprocessing step.
+Apply
+[`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html)
+and
+[`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to
+compute the preprocessing step.
 
 ```{r, message=FALSE}
 
@@ -1019,12 +1225,13 @@ rec %>%
 
 ## PCA exploration
 
-We can explore the results of the PCA using the `recipes::prep` and `recipes::tidy`. We can see that pca is done at step number 5
+We can explore the results of the PCA using the [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and
+[`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html). We can see that pca is done at step number 5
 
 ```{r, message=FALSE}
 
 recipes::prep(x = pca_recipe, training = Hitters_train) %>%
-  recipes::tidy() %>%
+  parsnip::tidy() %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
@@ -1033,7 +1240,7 @@ As such, we extract the results of step number 5 or the pca step.
 ```{r, message=FALSE}
 
 tidied_pca <- recipes::prep(x = pca_recipe, training = Hitters_train) %>%
-  recipes::tidy(5)
+  parsnip::tidy(5)
 
 
 tidied_pca %>%
@@ -1057,7 +1264,8 @@ tidied_pca %>%
 
 ```
 
-Let us take a closer look at the top 6 variables that contribute to the first four components
+Let us take a closer look at the top 6 variables that contribute to the
+first four components
 
 ```{r, message=FALSE}
 
@@ -1109,9 +1317,14 @@ dplyr::tibble(component = unique(tidied_pca$component)[1:4],
 
 ```
 
-Threshold is the fraction of the total variance that should be covered by the components. For example, `threshold = .75` means that step_pca should generate enough components to capture 75 percent of the variability in the variables. Note: using this argument will override and reset any value given to `num_comp`.
+Threshold is the fraction of the total variance that should be covered
+by the components. For example, `threshold = .75` means that step_pca
+should generate enough components to capture 75 percent of the
+variability in the variables. Note: using this argument will override
+and reset any value given to `num_comp`.
 
-We will now try to find the best threshold value using the [`tune::tune()`](https://hardhat.tidymodels.org/reference/tune.html)
+We will now try to find the best threshold value using the
+[`tune::tune()`](https://hardhat.tidymodels.org/reference/tune.html)
 
 ```{r, message=FALSE}
 
@@ -1142,6 +1355,12 @@ lm_spec %>%
 
 ## Create the workflow
 
+[`workflows::workflow`](https://workflows.tidymodels.org/reference/workflow.html),
+[`workflows::add_recipe`](https://workflows.tidymodels.org/reference/add_recipe.html)
+and
+[`workflows::add_model`](https://workflows.tidymodels.org/reference/add_model.html)
+are used.
+
 ```{r, message=FALSE, max.height='150px'}
 
 pca_workflow <-  workflows::workflow() %>% 
@@ -1155,11 +1374,15 @@ pca_workflow
 
 A threshold grid of $10$ numbers from $0$ to $1$ is created.
 
-```{r, message=FALSE}
-doParallel::registerDoParallel()
+Threshold grid is created using
+[`dials::grid_regular`](https://dials.tidymodels.org/reference/grid_regular.html)
+and
+[`dials::threshold`](https://dials.tidymodels.org/reference/threshold.html)
 
+```{r, message=FALSE}
 # Create a range from 10
-threshold_grid  <- dials::grid_regular(dials::threshold(range = c(0, 1)), levels = 10)
+threshold_grid  <- dials::grid_regular(x = dials::threshold(range = c(0, 1)), 
+                                       levels = 10)
 
 threshold_grid %>% 
   reactable::reactable(defaultPageSize = 5)
@@ -1167,10 +1390,17 @@ threshold_grid %>%
 
 ## Principal component regression model fitting on cross validated data
 
-Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+Now we have everything we need and we can fit all the models on the
+cross validated data with
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html).
+Note that this process may take some time.
+
+```{r, message=FALSE}
+doParallel::registerDoParallel()
+foreach::getDoParWorkers()
+```
 
 ```{r, message=FALSE, max.height='150px'}
-
 tune_res <- tune::tune_grid(
   object = pca_workflow,
   resamples = Hitters_fold, 
@@ -1180,14 +1410,18 @@ tune_res <- tune::tune_grid(
 tune_res
 ```
 
-Here we see how different threshold (Variance coverage) affects the performance metrics differently. Do note that using a different seed will give a different plot
+Here we see that the amount of regularization affects the performance
+metrics differently using
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html).
+Do note that using a different seed will give a different plot
 
 ```{r, message=FALSE}
 # Note that a different seed will give different plots
 tune::autoplot(tune_res)
 ```
 
-We can also see the raw metrics that created this chart by calling `tune::collect_metrics()`.
+We can also see the raw metrics that created this chart by calling
+[`tune::collect_metrics()`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1195,7 +1429,9 @@ tune::collect_metrics(tune_res) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Here is the `ggplot` way should `tune::autoplot` fails
+Here is the `ggplot` way should
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html)
+fails
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1214,7 +1450,16 @@ tune_res %>%
   ggplot2::theme(legend.position = "none")
 ```
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The threshold value is 0.889 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different best number of threshold value.
+Use
+[`tune::show_best`](https://tune.tidymodels.org/reference/show_best.html)
+to see the top few values for a given metric.
+
+The "best" values can be selected using
+[`tune::select_best`](https://tune.tidymodels.org/reference/show_best.html),
+this function requires you to specify a metric that it should select
+against. The threshold value is 0.889 for metric `rsme` since it gives
+the lowest value. Do note that using a different seed will give a
+different best number of threshold value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1228,7 +1473,9 @@ best_threshold
 
 ## Principal component regression model with optimised threshold value
 
-We create the principal component regression workflow with the best threshold.
+We create the principal component regression workflow with the best
+threshold using
+[`tune::finalize_workflow`](https://tune.tidymodels.org/reference/finalize_model.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1238,16 +1485,32 @@ pca_final <- tune::finalize_workflow(x = pca_workflow,
 pca_final
 ```
 
-We now train the principal component regression model with the training data
+We now train the principal component regression model with the training
+data using
+[`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html)
 
 ```{r, message=FALSE}
 
 pca_final_fit <- parsnip::fit(object = pca_final, data = Hitters_train)
 ```
 
+We can see the coefficients using
+[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html) and [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html)
+
+```{r, message=FALSE}
+pca_final_fit  %>%
+  tune::extract_fit_parsnip() %>%
+  parsnip::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
 ## Principal component regression model on test data
 
-This principal component regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+This principal component regression model can now be applied on our
+testing data set to validate its performance. For regression models, a
+`.pred` column is added when
+[`parsnip::augment`](https://parsnip.tidymodels.org/reference/augment.html)
+is used.
 
 ```{r, message=FALSE}
 
@@ -1258,13 +1521,19 @@ test_results %>%
   
 ```
 
+We check how well the `.pred` column matches the Salary using
+[`yardstick::rsq`](https://yardstick.tidymodels.org/reference/rsq.html).
+
 ```{r, message=FALSE}
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+Alternatively, we can use
+[`tune::last_fit`](https://tune.tidymodels.org/reference/last_fit.html)
+and
+[`tune::collect_metrics`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE}
 
@@ -1279,12 +1548,19 @@ test_results %>%
 
 # Partial Least Square
 
-The partial least square regression is a linear model with pls transformed data. Hence, the major changes will be on the preprocessing steps.
+The partial least square regression is a linear model with pls
+transformed data. Hence, the major changes will be on the preprocessing
+steps.
 
 ## Create the resample object
 
 First, we create a 10-fold cross-validation data set from the training
-data set with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html), [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html) and [`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
+data set with
+[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
+[`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
+and
+[`rsample::vfold_cv`](https://rsample.tidymodels.org/reference/vfold_cv.html).
 
 ```{r, message=FALSE}
 set.seed(1234)
@@ -1302,11 +1578,22 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-We create a recipe with [`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html), [`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html), [`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html), [`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html), [`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html) and [`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
+We create a recipe with
+[`recipes::recipe`](https://recipes.tidymodels.org/reference/recipe.html),
+[`recipes::all_nominal_predictors`](https://recipes.tidymodels.org/reference/has_role.html),
+[`recipes::all_predictors()`](https://recipes.tidymodels.org/reference/has_role.html),
+[`recipes::step_novel`](https://recipes.tidymodels.org/reference/step_novel.html),
+[`recipes::step_dummy`](https://recipes.tidymodels.org/reference/step_dummy.html),
+[`recipes::step_zv`](https://recipes.tidymodels.org/reference/step_zv.html)
+and
+[`recipes::step_normalize`](https://recipes.tidymodels.org/reference/step_normalize.html).
 
-We add [`recipes::step_pls`](https://recipes.tidymodels.org/reference/step_pls.html) this time to perform partial least square calculation on all the predictors.
-`num_comp` is the number of partial least square components to retain as new predictors.
-`outcome` is the response variable for partial least square regression to use.
+We add
+[`recipes::step_pls`](https://recipes.tidymodels.org/reference/step_pls.html)
+this time to perform partial least square calculation on all the
+predictors. `num_comp` is the number of partial least square components
+to retain as new predictors. `outcome` is the response variable for
+partial least square regression to use.
 
 ```{r, message=FALSE}
 
@@ -1319,7 +1606,11 @@ pls_recipe <-
   recipes::step_pls(recipes::all_predictors(), num_comp = 19 ,outcome = "Salary")
 ```
 
-Apply [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and [`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to compute the preprocessing step.
+Apply
+[`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html)
+and
+[`recipes::bake`](https://recipes.tidymodels.org/reference/bake.html) to
+compute the preprocessing step.
 
 ```{r, message=FALSE}
 
@@ -1337,12 +1628,13 @@ rec %>%
 
 ## PLS exploration
 
-We can explore the results of the PCA using the `recipes::prep` and `recipes::tidy`. We can see that pca is done at step number 5
+We can explore the results of the PCA using the [`recipes::prep`](https://recipes.tidymodels.org/reference/prep.html) and
+[`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html). We can see that pca is done at step number 5
 
 ```{r, message=FALSE}
 
 recipes::prep(x = pls_recipe, training = Hitters_train) %>%
-  recipes::tidy() %>%
+  parsnip::tidy() %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
@@ -1351,7 +1643,7 @@ As such, we extract the results of step number 5 or the pca step.
 ```{r, message=FALSE}
 
 tidied_pls <- recipes::prep(x = pls_recipe, training = Hitters_train) %>%
-  recipes::tidy(5)
+  parsnip::tidy(5)
 
 
 tidied_pls %>%
@@ -1375,7 +1667,8 @@ tidied_pls %>%
 
 ```
 
-Let us take a closer look at the top 6 variables that contribute to the first four components
+Let us take a closer look at the top 6 variables that contribute to the
+first four components
 
 ```{r, message=FALSE}
 
@@ -1405,8 +1698,10 @@ tidied_pls %>%
 
 ```
 
-`num_comp` is the number of partial least square components to retain as new predictors.
-We will now try to find the best number of component value using the [`tune::tune()`](https://hardhat.tidymodels.org/reference/tune.html)
+`num_comp` is the number of partial least square components to retain as
+new predictors. We will now try to find the best number of component
+value using the
+[`tune::tune()`](https://hardhat.tidymodels.org/reference/tune.html)
 
 ```{r, message=FALSE}
 
@@ -1437,6 +1732,12 @@ lm_spec %>%
 
 ## Create the workflow
 
+[`workflows::workflow`](https://workflows.tidymodels.org/reference/workflow.html),
+[`workflows::add_recipe`](https://workflows.tidymodels.org/reference/add_recipe.html)
+and
+[`workflows::add_model`](https://workflows.tidymodels.org/reference/add_model.html)
+are used.
+
 ```{r, message=FALSE, max.height='150px'}
 
 pls_workflow <-  workflows::workflow() %>% 
@@ -1446,15 +1747,19 @@ pls_workflow <-  workflows::workflow() %>%
 pls_workflow
 ```
 
-## Create the threshold grid
+## Create the number of components grid
 
 A number of components grid of $10$ numbers from $1$ to $20$ is created.
 
-```{r, message=FALSE}
-doParallel::registerDoParallel()
+Number of components grid is created using
+[`dials::grid_regular`](https://dials.tidymodels.org/reference/grid_regular.html)
+and
+[`dials::num_comp`](https://dials.tidymodels.org/reference/num_comp.html)
 
+```{r, message=FALSE}
 # Create a range from 10
-num_comp_grid  <- dials::grid_regular(dials::num_comp(range = c(1, 20)), levels = 10)
+num_comp_grid  <- dials::grid_regular(x = dials::num_comp(range = c(1, 20)), 
+                                      levels = 10)
 
 num_comp_grid %>% 
   reactable::reactable(defaultPageSize = 5)
@@ -1462,10 +1767,17 @@ num_comp_grid %>%
 
 ## Partial least square regression model fitting on cross validated data
 
-Now we have everything we need and we can fit all the models on the cross validated data. Note that this process may take some time.
+Now we have everything we need and we can fit all the models on the
+cross validated data with
+[`tune::tune_grid`](https://tune.tidymodels.org/reference/tune_grid.html).
+Note that this process may take some time.
+
+```{r, message=FALSE}
+doParallel::registerDoParallel()
+foreach::getDoParWorkers()
+```
 
 ```{r, message=FALSE, max.height='150px'}
-
 tune_res <- tune::tune_grid(
   object = pls_workflow,
   resamples = Hitters_fold, 
@@ -1475,14 +1787,28 @@ tune_res <- tune::tune_grid(
 tune_res
 ```
 
-Here we see how different number of components affects the performance metrics differently. Do note that using a different seed will give a different plot
+Here we see that the amount of regularization affects the performance
+metrics differently using
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html).
+Do note that using a different seed will give a different plot
 
 ```{r, message=FALSE}
 # Note that a different seed will give different plots
 tune::autoplot(tune_res)
 ```
 
-Here is the `ggplot` way should `tune::autoplot` fails
+We can also see the raw metrics that created this chart by calling
+[`tune::collect_metrics()`](https://tune.tidymodels.org/reference/collect_predictions.html).
+
+```{r, message=FALSE, max.height='150px'}
+
+tune::collect_metrics(tune_res) %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Here is the `ggplot` way should
+[`tune::autoplot`](https://tune.tidymodels.org/reference/autoplot.tune_results.html)
+fails
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1501,7 +1827,16 @@ tune_res %>%
   ggplot2::theme(legend.position = "none")
 ```
 
-The “best” values of this can be selected using `tune::select_best()`, this function requires you to specify a metric that it should select against. The number of components value is 1 for metric `rsme` since it gives the lowest value. Do note that using a different seed will give a different best number of components value.
+Use
+[`tune::show_best`](https://tune.tidymodels.org/reference/show_best.html)
+to see the top few values for a given metric.
+
+The "best" values can be selected using
+[`tune::select_best`](https://tune.tidymodels.org/reference/show_best.html),
+this function requires you to specify a metric that it should select
+against. The number of components value is 1 for metric `rsme` since it
+gives the lowest value. Do note that using a different seed will give a
+different best number of components value.
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1515,7 +1850,9 @@ best_num_comp
 
 ## Partial least square model with optimised threshold value
 
-We create the partial least square regression workflow with the best threshold.
+We create the partial least square regression workflow with the best
+threshold using
+[`tune::finalize_workflow`](https://tune.tidymodels.org/reference/finalize_model.html).
 
 ```{r, message=FALSE, max.height='150px'}
 
@@ -1525,16 +1862,32 @@ pls_final <- tune::finalize_workflow(x = pls_workflow,
 pls_final
 ```
 
-We now train the partial least square regression model with the training data.
+We now train the partial least square regression model with the training
+data using
+[`parsnip::fit`](https://parsnip.tidymodels.org/reference/fit.html)
 
 ```{r, message=FALSE}
 
 pls_final_fit <- parsnip::fit(object = pls_final, data = Hitters_train)
 ```
 
+We can see the coefficients using
+[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html) and [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html)
+
+```{r, message=FALSE}
+pls_final_fit  %>%
+  tune::extract_fit_parsnip() %>%
+  parsnip::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
 ## Partial least square regression model on test data
 
-This partial least square regression model can now be applied on our testing data set to validate its performance. For regression models, a .pred column is added.
+This partial least square regression model can now be applied on our
+testing data set to validate its performance. For regression models, a
+`.pred` column is added when
+[`parsnip::augment`](https://parsnip.tidymodels.org/reference/augment.html)
+is used.
 
 ```{r, message=FALSE}
 
@@ -1545,13 +1898,19 @@ test_results %>%
   
 ```
 
+We check how well the `.pred` column matches the Salary using
+[`yardstick::rsq`](https://yardstick.tidymodels.org/reference/rsq.html).
+
 ```{r, message=FALSE}
 test_results %>%
   yardstick::rsq(truth = .data[["Salary"]], estimate = .data[[".pred"]]) %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
-Alternatively, we can use `tune::last_fit` and `tune::collect_metrics`
+Alternatively, we can use
+[`tune::last_fit`](https://tune.tidymodels.org/reference/last_fit.html)
+and
+[`tune::collect_metrics`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE}
 
@@ -1566,9 +1925,29 @@ test_results %>%
 
 # Rmarkdown Template
 
-This Rmarkdown template is created by the [Reality Bending Lab](https://realitybending.github.io/). The template can be download from the lab's [github](https://github.com/RealityBending/TemplateResults) repository. For more information about the motivation behind creating this template, check out [Dr. Dominique Makowski's blog post](https://dominiquemakowski.github.io/post/2021-02-10-template_results/)
+This Rmarkdown template is created by the [Reality Bending
+Lab](https://realitybending.github.io/). The template can be download
+from the lab's
+[github](https://github.com/RealityBending/TemplateResults) repository.
+For more information about the motivation behind creating this template,
+check out [Dr. Dominique Makowski's blog
+post](https://dominiquemakowski.github.io/post/2021-02-10-template_results/)
+
+# Blog References
+
+-   Emil Hvitfeldt's [ISLR tidymodels
+    Labs](https://emilhvitfeldt.github.io/ISLR-tidymodels-labs/linear-model-selection-and-regularization.html)
+
+-   Julia Silge's
+    [blog](https://juliasilge.com/blog/lasso-the-office.html) titled
+    "LASSO regression using tidymodels and #TidyTuesday data for The
+    Office"
+
+-   Julia Silge's [blog](https://juliasilge.com/blog/best-hip-hop.html)
+    titled "PCA and the #TidyTuesday best hip hop songs ever"
 
 # Package References
+
 ```{r warning=FALSE, message=TRUE, results='asis'}
 report::cite_packages(sessionInfo())
 ```
