@@ -61,7 +61,7 @@ knitr::knit_hooks$set(
 knitr::opts_chunk$set(
   comment = ">",  # The prefix to be added before each line of the text output.
   dpi = 600,
-  fig.path = "figures/",
+  fig.path = "docs/figures/",
   fig.height = figheight,
   fig.width = figwidth,
   fig.align = "center",
