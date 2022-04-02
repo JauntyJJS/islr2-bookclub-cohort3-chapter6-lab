@@ -194,7 +194,7 @@ Here we fit up to a 19-variable model.
 regfit.full <- leaps::regsubsets(
   x = Salary ~ ., 
   data = Hitters,
-  nvmax = 19 #default
+  nvmax = 19
   )
 ```
 
