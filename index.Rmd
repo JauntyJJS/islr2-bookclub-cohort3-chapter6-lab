@@ -501,9 +501,9 @@ Need we need three things in order to use the
 
 ## Create the resample object
 
-First, we create a 10-fold cross-validation data set from the training
-data set with
-[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+First, we split the samples into a training set and a test set. From the training set, we create a 10-fold cross-validation data set from the training set.
+
+This is done with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
 and
@@ -866,9 +866,9 @@ regression section. The resampling step is the same.
 
 ## Create the resample object
 
-First, we create a 10-fold cross-validation data set from the training
-data set with
-[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+First, we split the samples into a training set and a test set. From the training set, we create a 10-fold cross-validation data set from the training set.
+
+This is done with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
 and
@@ -1169,9 +1169,9 @@ steps.
 
 ## Create the resample object
 
-First, we create a 10-fold cross-validation data set from the training
-data set with
-[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+First, we split the samples into a training set and a test set. From the training set, we create a 10-fold cross-validation data set from the training set.
+
+This is done with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
 and
@@ -1569,9 +1569,9 @@ steps.
 
 ## Create the resample object
 
-First, we create a 10-fold cross-validation data set from the training
-data set with
-[`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
+First, we split the samples into a training set and a test set. From the training set, we create a 10-fold cross-validation data set from the training set.
+
+This is done with [`rsample::initial_split`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::training`](https://rsample.tidymodels.org/reference/initial_split.html),
 [`rsample::testing`](https://rsample.tidymodels.org/reference/initial_split.html)
 and
