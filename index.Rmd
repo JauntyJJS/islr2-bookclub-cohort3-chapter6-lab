@@ -125,7 +125,6 @@ library(recipes, quietly=TRUE)
 library(dials, quietly=TRUE)
 library(tune, quietly=TRUE)
 library(workflows, quietly=TRUE)
-library(dials, quietly=TRUE)
 library(yardstick, quietly=TRUE)
 
 # For subset selection
@@ -525,7 +524,7 @@ Hitters_fold <- rsample::vfold_cv(Hitters_train, v = 10)
 
 ## Create the preprocessor
 
-We use the `recipes` package to create the preporcessing steps. However,
+We use the `recipes` package to create the preprocessing steps. However,
 the order of the preprocessing step is actually important. See the
 [Ordering of steps
 vignette](https://cran.r-project.org/web/packages/recipes/vignettes/Ordering.html)
@@ -659,7 +658,6 @@ and
 
 ```{r, message=FALSE}
 
-# Create a range from 10
 penalty_grid <- dials::grid_regular(x = dials::penalty(range = c(-5, 5),
                                                        trans = scales::log10_trans()
                                                        ), 
@@ -962,7 +960,7 @@ and
 [`scales::log10_trans`](https://scales.r-lib.org/reference/log_trans.html)
 
 ```{r, message=FALSE}
-# Create a range from 10
+
 penalty_grid <- dials::grid_regular(x = dials::penalty(range = c(-2, 2),
                                                        trans = scales::log10_trans()),  
                                     levels = 50)
@@ -1395,7 +1393,6 @@ and
 [`dials::threshold`](https://dials.tidymodels.org/reference/threshold.html)
 
 ```{r, message=FALSE}
-# Create a range from 10
 threshold_grid  <- dials::grid_regular(x = dials::threshold(range = c(0, 1)), 
                                        levels = 10)
 
@@ -1772,7 +1769,6 @@ and
 [`dials::num_comp`](https://dials.tidymodels.org/reference/num_comp.html)
 
 ```{r, message=FALSE}
-# Create a range from 10
 num_comp_grid  <- dials::grid_regular(x = dials::num_comp(range = c(1, 20)), 
                                       levels = 10)
 
