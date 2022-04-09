@@ -91,7 +91,7 @@ library(styler, quietly=TRUE)
 library(xaringanExtra, quietly=TRUE)
 
 # Dataset
-library(ISLR, quietly=TRUE)
+library(ISLR2, quietly=TRUE)
 
 # Session info and package reporting
 library(report, quietly=TRUE)
@@ -154,7 +154,7 @@ summary(report::report(sessionInfo()))
 set.seed(1234)
 ```
 
-We will be using the `Hitters` data set from the `ISLR` package. We wish
+We will be using the `Hitters` data set from the `ISLR2` package. We wish
 to predict the baseball players `Salary` based on several different
 characteristics which are included in the data set.
 
@@ -162,11 +162,12 @@ Remove all rows with missing data from that column.
 
 ```{r, message=FALSE}
 
-Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR2::Hitters) %>%
   tidyr::drop_na()
 
 Hitters %>%
-  reactable::reactable(defaultPageSize = 5)
+  reactable::reactable(defaultPageSize = 5,
+                       filterable = TRUE)
 ```
 
 Use `leaps::regsubsets` function to performs best subset selection.
@@ -432,7 +433,7 @@ Use
 to better understand the model created.
 
 ```{r, message=FALSE}
-Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR2::Hitters) %>%
   tidyr::drop_na()
 
 ridge_spec <- parsnip::linear_reg(mixture = 0,
@@ -510,7 +511,7 @@ and
 
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR2::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -874,7 +875,7 @@ and
 
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR2::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -1177,7 +1178,7 @@ and
 
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR2::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
@@ -1576,7 +1577,7 @@ and
 
 ```{r, message=FALSE}
 set.seed(1234)
-Hitters <- dplyr::as_tibble(ISLR::Hitters) %>%
+Hitters <- dplyr::as_tibble(ISLR2::Hitters) %>%
   tidyr::drop_na()
 
 Hitters_split <- rsample::initial_split(Hitters, strata = "Salary")
