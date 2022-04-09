@@ -849,13 +849,35 @@ and
 
 ```{r, message=FALSE}
 
-test_results <- tune::last_fit(object = ridge_final_fit, 
-                               split = Hitters_split) %>%
-  tune::collect_metrics()
+test_rs <- tune::last_fit(object = ridge_final_fit, 
+                          split = Hitters_split)
   
-test_results %>%
+test_rs %>%
+  tune::collect_metrics() %>%
   reactable::reactable(defaultPageSize = 5)
   
+```
+
+Use [`tune::collect_predictions`](https://tune.tidymodels.org/reference/collect_predictions.html), to see only the actual and predicted values of the test data.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Let us take a closer look at the predicted and actual response as a scatter plot.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["Salary"]],
+                                         y = .data[[".pred"]]
+                                         )
+                  ) +
+  ggplot2::geom_abline(slope = 1, lty = 2, color = "gray50", alpha = 0.5) +
+  ggplot2::geom_point(alpha = 0.6, color = "midnightblue") +
+  ggplot2::coord_fixed()
 ```
 
 # The Lasso
@@ -1151,13 +1173,35 @@ and
 
 ```{r, message=FALSE}
 
-test_results <- tune::last_fit(object = lasso_final_fit, 
-                               split = Hitters_split) %>%
-  tune::collect_metrics()
+test_rs <- tune::last_fit(object = lasso_final_fit, 
+                          split = Hitters_split)
   
-test_results %>%
+test_rs %>%
+  tune::collect_metrics() %>%
   reactable::reactable(defaultPageSize = 5)
   
+```
+
+Use [`tune::collect_predictions`](https://tune.tidymodels.org/reference/collect_predictions.html), to see only the actual and predicted values of the test data.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Let us take a closer look at the predicted and actual response as a scatter plot.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["Salary"]],
+                                         y = .data[[".pred"]]
+                                         )
+                  ) +
+  ggplot2::geom_abline(slope = 1, lty = 2, color = "gray50", alpha = 0.5) +
+  ggplot2::geom_point(alpha = 0.6, color = "midnightblue") +
+  ggplot2::coord_fixed()
 ```
 
 # Principal Components Regression
@@ -1550,13 +1594,35 @@ and
 
 ```{r, message=FALSE}
 
-test_results <- tune::last_fit(object = pca_final_fit, 
-                               split = Hitters_split) %>%
-  tune::collect_metrics()
+test_rs <- tune::last_fit(object = pca_final_fit, 
+                          split = Hitters_split)
   
-test_results %>%
+test_rs %>%
+  tune::collect_metrics() %>%
   reactable::reactable(defaultPageSize = 5)
   
+```
+
+Use [`tune::collect_predictions`](https://tune.tidymodels.org/reference/collect_predictions.html), to see only the actual and predicted values of the test data.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Let us take a closer look at the predicted and actual response as a scatter plot.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["Salary"]],
+                                         y = .data[[".pred"]]
+                                         )
+                  ) +
+  ggplot2::geom_abline(slope = 1, lty = 2, color = "gray50", alpha = 0.5) +
+  ggplot2::geom_point(alpha = 0.6, color = "midnightblue") +
+  ggplot2::coord_fixed()
 ```
 
 # Partial Least Square
@@ -1926,13 +1992,35 @@ and
 
 ```{r, message=FALSE}
 
-test_results <- tune::last_fit(object = pls_final_fit, 
-                               split = Hitters_split) %>%
-  tune::collect_metrics()
+test_rs <- tune::last_fit(object = pls_final_fit, 
+                          split = Hitters_split)
   
-test_results %>%
+test_rs %>%
+  tune::collect_metrics() %>%
   reactable::reactable(defaultPageSize = 5)
   
+```
+
+Use [`tune::collect_predictions`](https://tune.tidymodels.org/reference/collect_predictions.html), to see only the actual and predicted values of the test data.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Let us take a closer look at the predicted and actual response as a scatter plot.
+
+```{r, message=FALSE}
+test_rs %>%
+  tune::collect_predictions() %>%
+  ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["Salary"]],
+                                         y = .data[[".pred"]]
+                                         )
+                  ) +
+  ggplot2::geom_abline(slope = 1, lty = 2, color = "gray50", alpha = 0.5) +
+  ggplot2::geom_point(alpha = 0.6, color = "midnightblue") +
+  ggplot2::coord_fixed()
 ```
 
 # Rmarkdown Template
