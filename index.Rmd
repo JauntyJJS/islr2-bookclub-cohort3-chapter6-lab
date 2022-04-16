@@ -19,8 +19,6 @@ output:
   rmarkdown::html_vignette:
     toc: yes
     toc_depth: 2
-bibliography: utils/bibliography.bib
-csl: utils/f1000research.csl
 editor_options:
   chunk_output_type: console
   markdown: 
@@ -154,7 +152,7 @@ summary(report::report(sessionInfo()))
 set.seed(1234)
 ```
 
-We will be using the `Hitters` data set from the `ISLR2` package. We wish
+We will be using the [`Hitters`](https://rdrr.io/cran/ISLR2/man/Hitters.html) data set from the `ISLR2` package. We wish
 to predict the baseball players `Salary` based on several different
 characteristics which are included in the data set.
 
@@ -1258,7 +1256,7 @@ pca_recipe <-
   recipes::step_dummy(recipes::all_nominal_predictors()) %>% 
   recipes::step_zv(recipes::all_predictors()) %>% 
   recipes::step_normalize(recipes::all_predictors()) %>%
-  recipes::step_pca(recipes::all_predictors())
+  recipes::step_pca(recipes::all_predictors(), id = "pca")
 ```
 
 Apply
@@ -1297,11 +1295,11 @@ As such, we extract the results of step number 5 or the pca step.
 
 ```{r, message=FALSE}
 
-tidied_pca <- recipes::prep(x = pca_recipe, training = Hitters_train) %>%
-  parsnip::tidy(5)
+tidied_pca_loadings <- recipes::prep(x = pca_recipe, training = Hitters_train) %>%
+  parsnip::tidy(id = "pca", type = "coef")
 
 
-tidied_pca %>%
+tidied_pca_loadings %>%
   reactable::reactable(defaultPageSize = 5)
 
 ```
@@ -1310,7 +1308,7 @@ We make a visualization to see what the first four components look like
 
 ```{r, message=FALSE, fig.height = 8}
 
-tidied_pca %>%
+tidied_pca_loadings %>%
   dplyr::filter(.data[["component"]] %in% c("PC1", "PC2", "PC3", "PC4")) %>%
   dplyr::mutate(component = forcats::fct_inorder(.data[["component"]])) %>%
   ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["value"]], 
@@ -1327,7 +1325,7 @@ first four components
 
 ```{r, message=FALSE}
 
-tidied_pca %>%
+tidied_pca_loadings %>%
   dplyr::filter(.data[["component"]] %in% c("PC1", "PC2", "PC3", "PC4")) %>%
   dplyr::group_by(.data[["component"]]) %>%
   dplyr::top_n(6, abs(.data[["value"]])) %>%
@@ -1355,15 +1353,39 @@ tidied_pca %>%
 
 How much variation are we capturing for each component?
 
-```{r, message=FALSE}
+Here is how we can see the variance statistics but it is in a long form
 
+```{r, message=FALSE}
+tidied_pca_variance <- recipes::prep(x = pca_recipe, training = Hitters_train) %>%
+  broom::tidy(id = "pca", type = "variance")
+
+tidied_pca_variance %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Here is how we can see the variance statistics in its wide form
+
+```{r, message=FALSE}
+tidied_pca_variance %>% 
+  tidyr::pivot_wider(names_from = .data[["component"]], 
+                     values_from = .data[["value"]], 
+                     names_prefix = "PC") %>% 
+  dplyr::select(-dplyr::all_of("id")) %>% 
+  reactable::reactable(defaultPageSize = 5)
+```
+
+Here is a simple plot to show the variance captured for each component
+
+```{r, message=FALSE}
 # Get the variance
-pca_prep <- recipes::prep(x = pca_recipe, training = Hitters_train)
-sdev <- pca_prep$steps[[5]]$res$sdev
-percent_variation <- sdev^2 / sum(sdev^2)
+pca_variance <- tidied_pca_variance %>%
+  dplyr::filter(.data[["terms"]] == "variance") %>% 
+  dplyr::pull(.data[["value"]])
+  
+percent_variation <- pca_variance / sum(pca_variance)
 
 # I use [1:4] to select the first four components
-dplyr::tibble(component = unique(tidied_pca$component)[1:4], 
+dplyr::tibble(component = unique(tidied_pca_loadings$component)[1:4], 
               percent_var = percent_variation[1:4]) %>%
   dplyr::mutate(component = forcats::fct_inorder(.data[["component"]])) %>%
   ggplot2::ggplot(mapping = ggplot2::aes(x = .data[["component"]], 
