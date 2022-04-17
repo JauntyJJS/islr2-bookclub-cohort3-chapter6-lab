@@ -1378,11 +1378,11 @@ Here is a simple plot to show the variance captured for each component
 
 ```{r, message=FALSE}
 # Get the variance
-pca_variance <- tidied_pca_variance %>%
-  dplyr::filter(.data[["terms"]] == "variance") %>% 
+percent_variation <- tidied_pca_variance %>%
+  dplyr::filter(.data[["terms"]] == "percent variance") %>% 
   dplyr::pull(.data[["value"]])
-  
-percent_variation <- pca_variance / sum(pca_variance)
+
+percent_variation <- percent_variation/100
 
 # I use [1:4] to select the first four components
 dplyr::tibble(component = unique(tidied_pca_loadings$component)[1:4], 
