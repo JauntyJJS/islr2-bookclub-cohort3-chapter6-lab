@@ -330,21 +330,21 @@ for (i in 1:19) {
 val.errors
 ```
 
-We find that the best model is the one that contains seven variables.
+We find that the best model is the one that contains `r which.min(val.errors)` variables.
 
 ```{r, message=FALSE}
 which.min(val.errors)
 
-coef(regfit.best , 7)
+coef(regfit.best , which.min(val.errors))
 ```
 
-However, the best seven-variable model on the full data set has a
-different set of variables than the best seven-variable model on the
+However, the best model on the full data set usually has a
+different set of variables than the best model on the
 training set.
 
 ```{r, message=FALSE}
 regfit.best <- leaps::regsubsets(Salary ~ ., data = Hitters , nvmax = 19)
-coef(regfit.best , 7)
+coef(regfit.best , which.min(val.errors))
 ```
 
 ## Choosing Among Models Using Cross-Validation
