@@ -743,10 +743,12 @@ different best penalty/lambda value.
 ```{r, message=FALSE, max.height='150px'}
 
 top_penalty <- tune::show_best(tune_res, metric = "rsq", n = 5)
-top_penalty
+top_penalty %>%
+  reactable::reactable(defaultPageSize = 5)
 
 best_penalty <- tune::select_best(tune_res, metric = "rsq")
-best_penalty
+best_penalty %>%
+  reactable::reactable(defaultPageSize = 5)
 
 ```
 
@@ -1067,10 +1069,12 @@ different best penalty/lambda value.
 ```{r, message=FALSE, max.height='150px'}
 
 top_penalty <- tune::show_best(tune_res, metric = "rsq", n = 5)
-top_penalty
+top_penalty %>%
+  reactable::reactable(defaultPageSize = 5)
 
 best_penalty <- tune::select_best(tune_res, metric = "rsq")
-best_penalty
+best_penalty %>%
+  reactable::reactable(defaultPageSize = 5)
 
 ```
 
@@ -1543,10 +1547,12 @@ different best number of threshold value.
 ```{r, message=FALSE, max.height='150px'}
 
 top_threshold <- tune::show_best(tune_res, metric = "rmse", n = 5)
-top_threshold
+top_threshold %>%
+  reactable::reactable(defaultPageSize = 5)
 
 best_threshold <- tune::select_best(tune_res, metric = "rmse")
-best_threshold
+best_threshold %>%
+  reactable::reactable(defaultPageSize = 5)
 
 ```
 
@@ -1573,13 +1579,20 @@ data using
 pca_final_fit <- parsnip::fit(object = pca_final, data = Hitters_train)
 ```
 
-We can see the coefficients using
-[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html) and [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html)
+We can see the coefficients and statistics using
+[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html), [`broom::tidy`](https://broom.tidymodels.org/reference/tidy.lm.html) and [`broom::glance`](https://broom.tidymodels.org/reference/glance.lm.html) for `lm` class objects
 
 ```{r, message=FALSE}
 pca_final_fit  %>%
   tune::extract_fit_parsnip() %>%
-  parsnip::tidy() %>%
+  broom::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+```{r, message=FALSE}
+pca_final_fit  %>%
+  tune::extract_fit_parsnip() %>%
+  broom::glance() %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
@@ -1610,19 +1623,16 @@ test_results %>%
 ```
 
 Alternatively, we can use
-[`tune::last_fit`](https://tune.tidymodels.org/reference/last_fit.html)
-and
-[`tune::collect_metrics`](https://tune.tidymodels.org/reference/collect_predictions.html).
+[`tune::last_fit`](https://tune.tidymodels.org/reference/last_fit.html) and [`tune::collect_metrics`](https://tune.tidymodels.org/reference/collect_predictions.html).
 
 ```{r, message=FALSE}
 
 test_rs <- tune::last_fit(object = pca_final_fit, 
                           split = Hitters_split)
-  
+
 test_rs %>%
   tune::collect_metrics() %>%
   reactable::reactable(defaultPageSize = 5)
-  
 ```
 
 Use [`tune::collect_predictions`](https://tune.tidymodels.org/reference/collect_predictions.html), to see only the actual and predicted values of the test data.
@@ -1941,10 +1951,12 @@ different best number of components value.
 ```{r, message=FALSE, max.height='150px'}
 
 top_num_comp <- tune::show_best(tune_res, metric = "rmse", n = 5)
-top_num_comp
+top_num_comp %>%
+  reactable::reactable(defaultPageSize = 5)
 
 best_num_comp <- tune::select_best(tune_res, metric = "rmse")
-best_num_comp
+best_num_comp %>%
+  reactable::reactable(defaultPageSize = 5)
 
 ```
 
@@ -1971,13 +1983,20 @@ data using
 pls_final_fit <- parsnip::fit(object = pls_final, data = Hitters_train)
 ```
 
-We can see the coefficients using
-[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html) and [`parsnip::tidy`](https://parsnip.tidymodels.org/reference/tidy.model_fit.html)
+We can see the coefficients and statistics using
+[`tune::extract_fit_parsnip`](https://tune.tidymodels.org/reference/extract-tune.html), [`broom::tidy`](https://broom.tidymodels.org/reference/tidy.lm.html) and [`broom::glance`](https://broom.tidymodels.org/reference/glance.lm.html) for `lm` class objects
 
 ```{r, message=FALSE}
 pls_final_fit  %>%
   tune::extract_fit_parsnip() %>%
-  parsnip::tidy() %>%
+  broom::tidy() %>%
+  reactable::reactable(defaultPageSize = 5)
+```
+
+```{r, message=FALSE}
+pls_final_fit  %>%
+  tune::extract_fit_parsnip() %>%
+  broom::glance() %>%
   reactable::reactable(defaultPageSize = 5)
 ```
 
